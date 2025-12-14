@@ -1,0 +1,41 @@
+{
+  "name": "CustomerDeskAI",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "oxlint",
+    "ruler:apply": "pnpm dlx @intellectronica/ruler@latest apply --local-only",
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "format": "ultracite fix",
+    "lint": "ultracite lint",
+    "db:push": "turbo -F @CustomerDeskAI/db db:push",
+    "db:studio": "turbo -F @CustomerDeskAI/db db:studio",
+    "db:generate": "turbo -F @CustomerDeskAI/db db:generate",
+    "db:migrate": "turbo -F @CustomerDeskAI/db db:migrate",
+    "db:start": "turbo -F @CustomerDeskAI/db db:start",
+    "db:watch": "turbo -F @CustomerDeskAI/db db:watch",
+    "db:stop": "turbo -F @CustomerDeskAI/db db:stop",
+    "db:down": "turbo -F @CustomerDeskAI/db db:down"
+  },
+  "dependencies": {
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "@biomejs/biome": "2.3.8",
+    "ultracite": "6.4.0",
+    "oxlint": "^1.32.0",
+    "typescript": "^5",
+    "@types/bun": "catalog:"
+  },
+  "packageManager": "pnpm@10.23.0"
+}
