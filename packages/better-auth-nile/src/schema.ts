@@ -13,7 +13,7 @@ export const organizationSchema = z.object({
   slug: z.string(),
   logo: z.string().nullish(),
   metadata: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .or(z.string().transform((v) => JSON.parse(v)))
     .nullish(),
   createdAt: z.date(),
@@ -49,5 +49,7 @@ export type OrganizationInput = z.input<typeof organizationSchema>;
 
 export type InferRolesFromOption<O extends OrganizationOptions | undefined> =
   ZodLiteral<
-    O extends { roles: any } ? keyof O["roles"] : "admin" | "member" | "owner"
+    O extends { roles: Record<string, string[]> }
+      ? keyof O["roles"]
+      : "admin" | "member" | "owner"
   >;
