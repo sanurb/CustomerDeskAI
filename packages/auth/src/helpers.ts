@@ -16,7 +16,7 @@ import { and, eq } from "drizzle-orm";
 export async function resolveTenantBySlug(slug: string): Promise<{
   id: string;
   name: string;
-  slug: string;
+  slug: string | null;
   logo: string | null;
 } | null> {
   const tenant = await db.query.tenants.findFirst({

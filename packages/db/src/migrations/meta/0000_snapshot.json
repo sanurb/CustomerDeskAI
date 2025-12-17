@@ -212,9 +212,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -279,9 +277,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -442,10 +438,7 @@
       "compositePrimaryKeys": {
         "invitations_tenant_id_id_pk": {
           "name": "invitations_tenant_id_id_pk",
-          "columns": [
-            "tenant_id",
-            "id"
-          ]
+          "columns": ["tenant_id", "id"]
         }
       },
       "uniqueConstraints": {},
@@ -548,10 +541,7 @@
       "compositePrimaryKeys": {
         "tenant_users_tenant_id_user_id_pk": {
           "name": "tenant_users_tenant_id_user_id_pk",
-          "columns": [
-            "tenant_id",
-            "user_id"
-          ]
+          "columns": ["tenant_id", "user_id"]
         }
       },
       "uniqueConstraints": {},

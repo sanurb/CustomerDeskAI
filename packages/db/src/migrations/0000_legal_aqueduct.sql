@@ -82,6 +82,8 @@ ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "logo" text;
 --> statement-breakpoint
 ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "metadata" text;
 --> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "tenants_slug_idx" ON "tenants" USING btree ("slug");
+--> statement-breakpoint
 CREATE TABLE "todo" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"text" text NOT NULL,
