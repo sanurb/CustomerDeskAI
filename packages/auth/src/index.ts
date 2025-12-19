@@ -30,11 +30,13 @@ export const auth = betterAuth({
     joins: true,
   },
   advanced: {
-    generateId: () => uuidv4(),
     defaultCookieAttributes: {
       sameSite: "none",
       secure: true,
       httpOnly: true,
+    },
+    database: {
+      generateId: () => uuidv4(),
     },
   },
   session: {
@@ -44,6 +46,7 @@ export const auth = betterAuth({
     },
   },
   user: {
+    modelName: "users",
     fields: {
       image: "picture",
     },
