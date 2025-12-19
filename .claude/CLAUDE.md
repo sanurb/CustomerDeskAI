@@ -1,123 +1,253 @@
-# Ultracite Code Standards
+# Engineering Standards
 
-This project uses **Ultracite**, a zero-config Biome preset that enforces strict code quality standards through automated formatting and linting.
+This repository is a **TypeScript monorepo managed with Turborepo** and enforces **strict, opinionated engineering standards**.
 
-## Quick Reference
+Claude (and any AI assistant) MUST follow the rules in this document.
+If generated code contradicts these rules, the code is considered **incorrect**, even if it works.
 
-- **Format code**: `npx ultracite fix`
-- **Check for issues**: `npx ultracite check`
-- **Diagnose setup**: `npx ultracite doctor`
+## 1. Tooling & Enforcement (Non-Negotiable)  
 
-Biome (the underlying engine) provides extremely fast Rust-based linting and formatting. Most issues are automatically fixable.
+This project uses **Ultracite**, a zero-config preset built on **Biome**, to enforce formatting, linting, and correctness.
 
----
+### Required Commands
 
-## Core Principles
+- **Fix issues automatically**
+  ```bash
+  npx ultracite fix
+  ```
 
-Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
+* **Check code quality**
 
-### Type Safety & Explicitness
+  ```bash
+  npx ultracite check
+  ```
 
-- Use explicit types for function parameters and return values when they enhance clarity
-- Prefer `unknown` over `any` when the type is genuinely unknown
-- Use const assertions (`as const`) for immutable values and literal types
-- Leverage TypeScript's type narrowing instead of type assertions
-- Use meaningful variable names instead of magic numbers - extract constants with descriptive names
+* **Diagnose environment**
 
-### Modern JavaScript/TypeScript
+  ```bash
+  npx ultracite doctor
+  ```
 
-- Use arrow functions for callbacks and short functions
-- Prefer `for...of` loops over `.forEach()` and indexed `for` loops
-- Use optional chaining (`?.`) and nullish coalescing (`??`) for safer property access
-- Prefer template literals over string concatenation
-- Use destructuring for object and array assignments
-- Use `const` by default, `let` only when reassignment is needed, never `var`
+Claude MUST assume:
 
-### Async & Promises
+* Formatting and many lint issues are auto-fixable
+* Human review focuses on **architecture, correctness, and intent**, not style
 
-- Always `await` promises in async functions - don't forget to use the return value
-- Use `async/await` syntax instead of promise chains for better readability
-- Handle errors appropriately in async code with try-catch blocks
-- Don't use async functions as Promise executors
 
-### React & JSX
+## 2. Core Engineering Principles
 
-- Use function components over class components
-- Call hooks at the top level only, never conditionally
-- Specify all dependencies in hook dependency arrays correctly
-- Use the `key` prop for elements in iterables (prefer unique IDs over array indices)
-- Nest children between opening and closing tags instead of passing as props
-- Don't define components inside other components
-- Use semantic HTML and ARIA attributes for accessibility:
-  - Provide meaningful alt text for images
-  - Use proper heading hierarchy
-  - Add labels for form inputs
-  - Include keyboard event handlers alongside mouse events
-  - Use semantic elements (`<button>`, `<nav>`, etc.) instead of divs with roles
+Write code that is:
 
-### Error Handling & Debugging
+* **Explicit** over implicit
+* **Type-safe** over convenient
+* **Readable** over clever
+* **Predictable** over magical
+* **Maintainable at scale**
 
-- Remove `console.log`, `debugger`, and `alert` statements from production code
-- Throw `Error` objects with descriptive messages, not strings or other values
-- Use `try-catch` blocks meaningfully - don't catch errors just to rethrow them
-- Prefer early returns over nested conditionals for error cases
+Clarity of intent is more important than brevity.
 
-### Code Organization
 
-- Keep functions focused and under reasonable cognitive complexity limits
-- Extract complex conditions into well-named boolean variables
-- Use early returns to reduce nesting
-- Prefer simple conditionals over nested ternary operators
-- Group related code together and separate concerns
+## 3. TypeScript Standards (Very Important)
 
-### Security
+### 3.1 Type Safety & Explicitness
 
-- Add `rel="noopener"` when using `target="_blank"` on links
-- Avoid `dangerouslySetInnerHTML` unless absolutely necessary
-- Don't use `eval()` or assign directly to `document.cookie`
-- Validate and sanitize user input
+* Prefer **explicit parameter and return types** when they add clarity
+* Prefer `unknown` over `any`
+* `any` is allowed **only**:
 
-### Performance
+  * inside generic implementations where TypeScript cannot model runtime logic
+* Use `as const` for immutable objects and enum-like behavior
+* Prefer type narrowing (`if`, `switch`) over type assertions
+* Never rely on structural coincidence — model intent explicitly
 
-- Avoid spread syntax in accumulators within loops
-- Use top-level regex literals instead of creating them in loops
-- Prefer specific imports over namespace imports
-- Avoid barrel files (index files that re-export everything)
-- Use proper image components (e.g., Next.js `<Image>`) over `<img>` tags
+### 3.2 Discriminated Unions (Required Pattern)
 
-### Framework-Specific Guidance
+Use discriminated unions to model state machines, events, and async states.
 
-**Next.js:**
-- Use Next.js `<Image>` component for images
-- Use `next/head` or App Router metadata API for head elements
-- Use Server Components for async data fetching instead of async Client Components
+**Avoid “bag of optionals”.**
 
-**React 19+:**
-- Use ref as a prop instead of `React.forwardRef`
+```ts
+type FetchState<TData> =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: TData }
+  | { status: "error"; error: Error };
+```
 
-**Solid/Svelte/Vue/Qwik:**
-- Use `class` and `for` attributes (not `className` or `htmlFor`)
+Always exhaustively handle unions using `switch`.
 
----
 
-## Testing
+### 3.3 Enums (Do NOT Introduce New Ones)
 
-- Write assertions inside `it()` or `test()` blocks
-- Avoid done callbacks in async tests - use async/await instead
-- Don't use `.only` or `.skip` in committed code
-- Keep test suites reasonably flat - avoid excessive `describe` nesting
+* Do **not** introduce new `enum`s
+* Keep existing enums only if already present
+* Use `as const` objects instead
 
-## When Biome Can't Help
+```ts
+const Role = {
+  ADMIN: "admin",
+  USER: "user",
+} as const;
 
-Biome's linter will catch most issues automatically. Focus your attention on:
+type Role = (typeof Role)[keyof typeof Role];
+```
 
-1. **Business logic correctness** - Biome can't validate your algorithms
-2. **Meaningful naming** - Use descriptive names for functions, variables, and types
-3. **Architecture decisions** - Component structure, data flow, and API design
-4. **Edge cases** - Handle boundary conditions and error states
-5. **User experience** - Accessibility, performance, and usability considerations
-6. **Documentation** - Add comments for complex logic, but prefer self-documenting code
 
----
+### 3.4 Imports & Exports
 
-Most formatting and common issues are automatically fixed by Biome. Run `npx ultracite fix` before committing to ensure compliance.
+#### Default Exports
+
+* **Do not use default exports**
+* Named exports are the standard
+* Default exports are allowed **only if required by a framework** (e.g. Next.js pages)
+
+#### Type Imports
+
+* Always use `import type`
+* Prefer top-level `import type` statements
+
+```ts
+import type { User } from "./user";
+```
+
+
+## 4. Modern JavaScript / TypeScript Practices
+
+* Prefer `const` by default, `let` only when reassignment is required
+* Never use `var`
+* Prefer `for...of` over `.forEach()`
+* Prefer template literals over string concatenation
+* Use optional chaining (`?.`) and nullish coalescing (`??`)
+* Use destructuring for objects and arrays
+* Avoid nested ternaries
+* Prefer early returns to reduce nesting
+
+
+## 5. Async & Error Handling
+
+* Always `await` promises in async functions
+* Prefer `async/await` over `.then()`
+* Never use async functions as Promise executors
+* Handle errors intentionally:
+
+  * Don’t catch errors just to rethrow them
+  * Throw `Error` objects with meaningful messages
+* Prefer fail-fast and explicit error paths
+
+
+## 6. React / UI Standards
+
+### React Rules
+
+* Use function components only
+* Hooks must be called unconditionally at the top level
+* All hook dependencies must be correct
+* Do not define components inside other components
+* Use stable keys (never array indices)
+
+### Accessibility (Mandatory)
+
+* Use semantic HTML (`button`, `nav`, `main`, etc.)
+* Provide alt text for images
+* Use proper heading hierarchy
+* Always label form inputs
+* Keyboard support must mirror mouse interactions
+* Avoid `div` + `role` when semantic elements exist
+
+
+## 7. Security Rules
+
+* Add `rel="noopener noreferrer"` to `target="_blank"` links
+* Avoid `dangerouslySetInnerHTML`
+* Never use `eval`
+* Never manipulate `document.cookie` directly
+* Validate and sanitize all user input
+* Assume all external input is untrusted
+
+
+## 8. Performance Guidelines
+
+* Avoid object/array spread in hot loops
+* Hoist regex literals out of loops
+* Prefer specific imports over namespace imports
+* Avoid barrel files (`index.ts` re-exporting everything)
+* Use framework-native image components (e.g. Next.js `<Image />`)
+
+
+## 9. Testing Standards
+
+* Use `it()` / `test()` blocks only
+* Use async/await — never `done`
+* Do not commit `.only` or `.skip`
+* Avoid deep `describe` nesting
+* Test behavior, not implementation details
+
+
+## 10. Documentation & JSDoc
+
+* Add JSDoc only when behavior is **not obvious**
+* Be concise and precise
+* Use `{@link}` for internal references
+* Prefer self-documenting code over comments
+
+
+## 11. Installing Dependencies
+
+Claude MUST NOT guess versions.
+
+Always install libraries using the package manager:
+
+```bash
+pnpm add <package>
+pnpm add -D <package>
+```
+
+Never manually edit `package.json` versions.
+
+
+## 12. AI-Specific Rules (Critical)
+
+When Claude works on this repository:
+
+1. **Plan before coding**
+
+   * Summarize relevant context
+   * Identify constraints and invariants
+   * Propose a solution and trade-offs
+
+2. **Diff-first workflow**
+
+   * Show diffs before applying changes
+   * Keep changes small and focused
+   * Never mix refactors with formatting-only changes
+
+3. **Respect architecture**
+
+   * Do not introduce hidden state
+   * Do not bypass existing boundaries
+   * Do not “simplify” by removing safety checks
+
+4. **Tests are not optional**
+
+   * If behavior changes, tests must change or be added
+
+5. **If unsure: ask**
+
+   * Never assume business rules
+   * Never invent requirements
+
+
+## Final Reminder
+
+Ultracite and Biome handle formatting and linting.
+
+**Your job is to ensure:**
+
+* Correctness
+* Explicit intent
+* Architectural integrity
+* Long-term maintainability
+
+If the code is clever but unclear — it is wrong.
+If it works but violates invariants — it is wrong.
+If it is hard to reason about — it is wrong.

@@ -1,115 +1,155 @@
 # Active Development Context
 
 ## Current Work Focus:
-* **Primary focus:** Establish a **correct-by-construction multi-tenant foundation** by completing the integration between **NileDB + Drizzle + Better-Auth**, using the new internal package **`packages/better-auth-nile`** as the canonical organization/tenant layer.
-* **Immediate objective:** Make tenant identity **explicit in the URL** (not headers), and upgrade the request execution model so every tenant-scoped operation runs with:
-  - authenticated session (when required)
-  - resolved tenant (slug → tenantId)
-  - verified membership + roles
-  - tenant-scoped data access (repos/db scope)
-* **Definition of “ready to build features”:** after the above is in place, the team can safely implement Tickets and Knowledge Base without risking cross-tenant leakage or accumulating structural debt.
+* **Active Step:** Step 3 — Backend Integration
+* **Scope:** ElysiaJS + oRPC with **Drizzle ORM as the sole data-access layer**
+* **Explicit Exclusion:** The Nile SDK (`@niledatabase/server`) is **not used for queries**. All data access goes through Drizzle ORM against Nile-integrated PostgreSQL tables.
+
+## Tenant Isolation Enforcement (By Construction)
+
+Tenant isolation is **correct-by-construction**. The invariant is:
+
+1. Every request **MUST** resolve: `tenantSlug` → `tenantId` → `membership`
+2. Tenant identity comes from the **URL** (`/t/:tenantSlug/*`), not headers
+3. Membership is derived from Better-Auth session data (`active_organization_id` on session)
+4. **No repository or query may exist without an explicit `tenantId`**
+
+This means:
+- Tenant-scoped routes fail fast if tenant cannot be resolved
+- Tenant-scoped routes fail fast if user is not a member of that tenant
+- All tenant-scoped repositories require `tenantId` at construction time
+- There is no global DB handle for tenant-scoped operations
 
 
-## Active Decisions and Considerations:
-* **Tenant identity propagation (canonical):**
-  - Decision in progress: tenant MUST be expressed as a URL prefix for tenant-scoped APIs:
-    - `/t/:tenantSlug/rpc/*`
-    - `/t/:tenantSlug/api-reference/*`
-  - Considerations: URL tenancy improves debuggability, log correlation, cache semantics, and prevents “hidden tenancy” bugs. It also requires a deterministic slug policy.
+## Locked Architectural Decisions
 
-* **Tenant slug policy (needs locking):**
-  - Format constraints (lowercase, allowed chars, length)
-  - Normalization rules (case folding, trimming, reserved words)
-  - Collision behavior and migration strategy
+The following decisions are **frozen** for this implementation step:
 
-* **Uniqueness enforcement for tenant slug (DB vs application):**
-  - `packages/better-auth-nile` schema declares `slug` as `unique: true`, but Nile tenant virtualization constraints may limit uniqueness enforcement on `tenants.slug`.
-  - Active decision: enforce uniqueness at DB level if fully supported; otherwise implement **application-level uniqueness** with concurrency-safe creation semantics.
-
-* **Authorization model: roles and permissions**
-  - Active decision: finalize role taxonomy (Owner/Admin/Support/Customer) and whether tenants can define custom roles.
-  - `better-auth-nile` stores member roles as an array (`roles` column), while plugin reads `member.role[0]`; need to ensure canonical representation and avoid role drift.
-
-* **DB access strategy for tenant checks: Nile SDK vs Drizzle-only**
-  - The demo uses the Nile SDK `getInstance()` pattern in Next.js.
-  - Our architecture prefers Elysia backend and Drizzle repositories.
-  - Active decision: default to **Drizzle + Nile tables** for membership and tenant resolution; only introduce Nile SDK server-side if a specific Nile-only feature is required.
-
-* **OpenAPI routing alignment**
-  - Current server code has a known mismatch risk between route path and handler prefix.
-  - Decision: standardize OpenAPI under `/api-reference/*` (and tenant-scoped variant under `/t/:tenantSlug/api-reference/*`) with exact prefix alignment.
-
-* **AI endpoint safety**
-  - `/ai` currently streams model output without enforcing tenant invariants.
-  - Active decision: AI endpoints must become tenant-scoped (`/t/:tenantSlug/...`) and require membership if they consume tenant data; no tenant data processing until invariants exist.
+| Decision | Status |
+|----------|--------|
+| **UUIDs everywhere** | Locked — all primary keys and foreign keys use UUID |
+| **Nile-integrated tables migrated** | Locked — `users`, `tenants`, `tenant_users` exist and are managed by Better-Auth + better-auth-nile |
+| **No AsyncLocalStorage** | Locked — context is passed explicitly, never stored in async context |
+| **No implicit tenant context** | Locked — tenant MUST come from URL params and be validated |
+| **No cross-scope foreign keys** | Locked — tenant-scoped tables cannot FK to other tenants' data |
+| **Roles stored as TEXT[]** | Locked — `tenant_users.roles` column is `TEXT[]` array |
+| **Drizzle-only data access** | Locked — Nile SDK is not used for queries; Drizzle ORM is the sole data-access layer |
 
 
-## Recent Changes:
-* **New internal package introduced:** `packages/better-auth-nile`
-  - Adds a **server plugin** (`nile()` in `organization.ts`) mapping Better-Auth organization concepts to Nile integrated tables:
-    - organizations → `tenants`
-    - members → `tenant_users`
-    - session field → `activeOrganizationId`
-    - roles → `roles` array field mapping
-  - Adds a **client plugin** (`organizationClient()` in `client.ts`) enabling:
-    - listing organizations (`/organization/list`)
-    - retrieving active organization (`/organization/get-full-organization`)
-    - retrieving active member (`/organization/get-active-member`)
-    - role permission checks (client-side evaluation)
+## Required Backend Deliverables (Step 3)
 
-* **Current server entrypoint exists:** `apps/server/src/index.ts`
-  - Routes configured for:
-    - Better-Auth handler: `/api/auth/*`
-    - oRPC RPC handler: `/rpc*`
-    - OpenAPI handler: `/api*` (requires standardization)
-    - AI streaming: `/ai`
+### 1. Tenant-Scoped Routing
 
-* **Current API context exists:** `packages/api/src/context.ts`
-  - Returns only `{ session }` via `auth.api.getSession(...)`
-  - Does not resolve tenant or membership yet (this is now the highest priority gap)
+Implement URL-based tenant routing in `apps/server`:
 
-* **Current DB bootstrap exists:** `packages/db/src/index.ts`
-  - Uses `dotenv.config()` with a hardcoded path and `drizzle(connectionString)`
-  - Not yet configured for Nile conventions or production-grade pooling (planned change)
+```
+/t/:tenantSlug/rpc/*         → oRPC RPCHandler (tenant-scoped procedures)
+/t/:tenantSlug/api-reference/* → OpenAPIHandler (tenant-scoped docs)
+```
+
+Global endpoints (outside tenant scope):
+```
+/api/auth/*      → Better-Auth handler
+/rpc/*           → oRPC RPCHandler (global procedures only)
+/api-reference/* → OpenAPIHandler (global docs)
+```
+
+### 2. Request-Scoped `createContext`
+
+Upgrade `packages/api/src/context.ts` to return a strict, tenant-aware context:
+
+```typescript
+interface TenantContext {
+  // Request metadata
+  requestId: string;
+  
+  // Auth (nullable for public routes)
+  session: Session | null;
+  userId: string | null;
+  
+  // Tenant resolution (nullable for global routes)
+  tenantSlug: string | null;
+  tenantId: string | null;       // UUID, resolved from tenantSlug
+  membership: Membership | null;  // includes roles[]
+  
+  // Tenant-scoped data access (only present for tenant-scoped routes)
+  repos: TenantScopedRepos | null;
+}
+```
+
+Resolution flow:
+1. Extract `tenantSlug` from route params
+2. Query `tenants` table by slug → get `tenantId`
+3. If authenticated, query `tenant_users` by `(tenantId, userId)` → get `membership`
+4. Construct tenant-scoped repositories with `tenantId` baked in
+
+### 3. Guard Utilities
+
+Implement centralized authorization guards in `packages/api`:
+
+```typescript
+// Throws UNAUTHORIZED if no session
+function requireAuth(ctx: TenantContext): asserts ctx is { session: Session; userId: string; ... }
+
+// Throws NOT_FOUND if tenant cannot be resolved from slug
+function requireTenant(ctx: TenantContext): asserts ctx is { tenantId: string; tenantSlug: string; ... }
+
+// Throws FORBIDDEN if user is not a member of the tenant
+function requireMembership(ctx: TenantContext): asserts ctx is { membership: Membership; ... }
+
+// Throws FORBIDDEN if user lacks required role(s)
+function requireRole(ctx: TenantContext, roles: Role[]): void
+```
+
+Guards enforce at procedure boundaries. Business logic never performs inline authorization.
 
 
-## Next Steps:
-* **1) Tenant-aware routing (URL tenancy)**
-  - Implement canonical tenant-scoped endpoints:
-    - `/t/:tenantSlug/rpc/*`
-    - `/t/:tenantSlug/api-reference/*`
-  - Keep global endpoints:
-    - `/api/auth/*`
-    - `/organization/*`
-  - Ensure oRPC handler prefixes match route paths exactly.
+## Out of Scope (Step 3)
 
-* **2) Upgrade `createContext` to tenant-aware strict context**
-  - Resolve `tenantSlug` from route params.
-  - Resolve `tenantId` from `tenants` table.
-  - Fetch membership from `tenant_users` for authenticated users.
-  - Attach roles and permission helpers.
-  - Provide tenant-scoped repo/db handle for tenant-scoped routes.
+The following are **explicitly not part of this step**:
 
-* **3) Make DB package production-safe**
-  - Remove hardcoded dotenv path from `@CustomerDeskAI/db`.
-  - Introduce `pg.Pool` and drizzle initialization via injected config.
-  - Establish migration discipline (`generate+migrate` as default).
+- **Frontend changes** — Web app updates are deferred to Step 4 (Client Integration)
+- **AI endpoints** — `/ai` remains unchanged; tenant-scoped AI comes after tenant invariants are proven
+- **Product schema** — `tickets`, `ticket_messages`, `knowledge_base_articles` are Step 5
+- **Observability** — Structured logging is Step 8
 
-* **4) Wire Better-Auth + `better-auth-nile` into `@CustomerDeskAI/auth`**
-  - Ensure the Better-Auth handler exposes `/organization/*` endpoints.
-  - Validate schema mappings and role storage behavior.
 
-* **5) Resolve tenant slug uniqueness strategy**
-  - Confirm Nile constraints for `tenants.slug`.
-  - Implement DB-level uniqueness if supported; otherwise implement application-level uniqueness with concurrency-safe semantics.
+## Verification Requirements
 
-* **6) Freeze minimal vertical slice for platform validation**
-  - Sign up / sign in
-  - Create tenant
-  - List tenants
-  - Set active tenant
-  - Navigate under `/t/:tenantSlug/...` with strict membership enforcement
+After making changes, **always verify**:
 
-* **7) Lock down AI**
-  - Do not use `/ai` with tenant data until tenant invariants are enforced.
-  - Design tenant-scoped AI endpoints only after tickets/KB data paths are safely tenant-scoped.
+```bash
+# Typecheck entire workspace
+pnpm -w typecheck
+
+# Lint and format check
+npx ultracite check
+```
+
+Both must pass before considering work complete.
+
+
+## Files Likely to Change
+
+| File | Purpose |
+|------|---------|
+| `apps/server/src/index.ts` | Add tenant-scoped route groups |
+| `packages/api/src/context.ts` | Upgrade to tenant-aware context factory |
+| `packages/api/src/guards.ts` | New file for authorization guards |
+| `packages/auth/src/helpers.ts` | Tenant/membership resolution via Drizzle |
+| `packages/db/src/index.ts` | May need tenant-scoped repo factory exports |
+
+
+## Reference: Current State
+
+From `tasks_plan.md`, Step 3 maps to:
+- Task 3.1: Implement tenant-scoped routing prefixes
+- Task 3.2: Fix OpenAPI routing consistency
+- Task 3.3: Upgrade `createContext` to strict tenant-aware context
+- Task 3.4: Implement guard middleware
+- Task 3.5: Define stable typed error contract
+
+Dependencies satisfied:
+- Nile-integrated tables exist (migration `0000_legal_aqueduct.sql` applied)
+- `packages/better-auth-nile` provides schema mappings for organizations → tenants
+- `packages/auth` has base Better-Auth configuration
