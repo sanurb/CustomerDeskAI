@@ -7,21 +7,30 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
+import { users } from "./auth";
 
 /**
- * Nile-integrated tenant tables
- * Maps Better-Auth organization plugin to Nile tenant model
+ * Nile-integrated tenant tables.
  *
- * CRITICAL: Nile requires composite primary keys that include tenant_id
- * for all tenant-scoped tables. This is how Nile enforces tenant isolation.
+ * This module defines the tenant-aware data model required by Nile and
+ * the Better Auth organization plugin.
  *
- * NOTE: The tenants table already exists in Nile DB and will be ALTERed
- * via migration to add slug, logo, and metadata columns. We define a minimal
- * reference here for Drizzle relations only - not for schema generation.
+ * IMPORTANT:
+ * - Tenant isolation is enforced by Nile using composite primary keys.
+ * - No foreign keys are declared at the database level.
+ * - Drizzle relations are informational only and used for query ergonomics.
  */
 
-// Minimal tenants table reference for relations (table already exists in DB)
+/**
+ * Minimal reference to the `tenants` table managed by Nile.
+ *
+ * WHY:
+ * - The tenants table is created and owned by Nile.
+ * - We intentionally define a minimal schema here to enable Drizzle relations
+ *   without allowing schema generation or migrations to recreate it.
+ *
+ * This table MUST NOT be altered via Drizzle except through explicit SQL migrations.
+ */
 export const tenants = pgTable("tenants", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
@@ -31,47 +40,99 @@ export const tenants = pgTable("tenants", {
   created: timestamp("created", { withTimezone: true }),
 });
 
+/**
+ * Maps users to tenants with explicit role assignments.
+ *
+ * CRITICAL INVARIANT:
+ * - The composite primary key (tenant_id, user_id) is REQUIRED by Nile.
+ * - Removing or changing this breaks tenant isolation guarantees.
+ */
 export const tenantUsers = pgTable(
   "tenant_users",
   {
     id: uuid("id").defaultRandom().notNull(),
-    tenant_id: uuid("tenant_id").notNull(), // No FK, index only
-    user_id: uuid("user_id").notNull(), // UUID to match users.id, no FK
-    roles: text("roles").array().notNull().default(["member"]), // ["owner", "admin", "member"]
+
+    /**
+     * Logical reference to {@link tenants.id}.
+     * No FK is declared to avoid cross-scope constraints.
+     */
+    tenant_id: uuid("tenant_id").notNull(),
+
+    /**
+     * Logical reference to {@link users.id}.
+     * UUID is mandatory to match the global user identity model.
+     */
+    user_id: uuid("user_id").notNull(),
+
+    /**
+     * Role list within the tenant context.
+     * Stored as TEXT[] to allow flexible role expansion without migrations.
+     */
+    roles: text("roles").array().notNull().default(["member"]),
+
     created: timestamp("created", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
-    // Composite PK (tenant_id, user_id) required by Nile for tenant-scoped tables
     primaryKey({ columns: [table.tenant_id, table.user_id] }),
+
     index("tenant_users_tenant_id_idx").on(table.tenant_id),
     index("tenant_users_user_id_idx").on(table.user_id),
-    // Composite index for common query pattern: membership lookup by tenant + user
+
+    /**
+     * Optimizes the most common access pattern:
+     * "Is user X a member of tenant Y?"
+     */
     index("tenant_users_tenant_user_idx").on(table.tenant_id, table.user_id),
   ]
 );
 
+/**
+ * Pending invitations to join a tenant.
+ *
+ * Invitations are tenant-scoped and intentionally do NOT reference users,
+ * since the invited user may not exist yet.
+ */
 export const invitations = pgTable(
   "invitations",
   {
     id: uuid("id").defaultRandom().notNull(),
-    tenant_id: uuid("tenant_id").notNull(), // No FK, index only
+
+    /**
+     * Tenant to which the invitation belongs.
+     */
+    tenant_id: uuid("tenant_id").notNull(),
+
     email: text("email").notNull(),
+
     roles: text("roles").array().notNull().default(["member"]),
-    status: text("status").notNull().default("pending"), // "pending" | "accepted" | "rejected" | "canceled"
+
+    /**
+     * Invitation lifecycle status.
+     */
+    status: text("status").notNull().default("pending"),
+
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    inviterId: uuid("inviter_id").notNull(), // UUID to match users.id, no FK
+
+    /**
+     * Logical reference to {@link users.id}.
+     * Stored for auditability (who invited whom).
+     */
+    inviterId: uuid("inviter_id").notNull(),
   },
   (table) => [
-    // Composite PK (tenant_id, id) required by Nile for tenant-scoped tables
     primaryKey({ columns: [table.tenant_id, table.id] }),
+
     index("invitations_tenant_id_idx").on(table.tenant_id),
     index("invitations_email_idx").on(table.email),
   ]
 );
 
-// Relations for Drizzle query API
+/**
+ * Drizzle relations for tenant-scoped queries.
+ * These do NOT imply database-level constraints.
+ */
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   members: many(tenantUsers),
   invitations: many(invitations),
@@ -82,9 +143,9 @@ export const tenantUsersRelations = relations(tenantUsers, ({ one }) => ({
     fields: [tenantUsers.tenant_id],
     references: [tenants.id],
   }),
-  user: one(user, {
+  user: one(users, {
     fields: [tenantUsers.user_id],
-    references: [user.id],
+    references: [users.id],
   }),
 }));
 
@@ -93,8 +154,8 @@ export const invitationsRelations = relations(invitations, ({ one }) => ({
     fields: [invitations.tenant_id],
     references: [tenants.id],
   }),
-  inviter: one(user, {
+  inviter: one(users, {
     fields: [invitations.inviterId],
-    references: [user.id],
+    references: [users.id],
   }),
 }));

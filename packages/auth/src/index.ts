@@ -3,26 +3,24 @@ import * as authSchema from "@CustomerDeskAI/db/schema/auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { admin, bearer, multiSession, openAPI } from "better-auth/plugins";
+import {
+  admin,
+  bearer,
+  multiSession,
+  openAPI,
+  twoFactor,
+} from "better-auth/plugins";
 import { nile } from "better-auth-nile";
 import { v4 as uuidv4 } from "uuid";
 
-/**
- * Explicit schema object for Better Auth Drizzle adapter
- * Maps Better Auth's expected table names to Drizzle schema exports
- */
-const schema = {
-  user: authSchema.user,
-  session: authSchema.session,
-  account: authSchema.account,
-  verification: authSchema.verification,
-};
+const schema = authSchema;
 
 export const auth = betterAuth({
   appName: "CustomerDeskAI",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
+    usePlural: true,
   }),
   trustedOrigins: [process.env.CORS_ORIGIN || ""],
   emailAndPassword: {
@@ -57,6 +55,7 @@ export const auth = betterAuth({
     admin(),
     multiSession(),
     nextCookies(),
+    twoFactor(),
   ],
 });
 
