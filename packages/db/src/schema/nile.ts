@@ -46,8 +46,10 @@ export const tenants = pgTable("tenants", {
  * CRITICAL INVARIANT:
  * - The composite primary key (tenant_id, user_id) is REQUIRED by Nile.
  * - Removing or changing this breaks tenant isolation guarantees.
+ *
+ * NOTE: Exported as tenant_users (snake_case) to match Better Auth's model name lookup.
  */
-export const tenantUsers = pgTable(
+export const tenant_users = pgTable(
   "tenant_users",
   {
     id: uuid("id").defaultRandom().notNull(),
@@ -134,17 +136,17 @@ export const invitations = pgTable(
  * These do NOT imply database-level constraints.
  */
 export const tenantsRelations = relations(tenants, ({ many }) => ({
-  members: many(tenantUsers),
+  members: many(tenant_users),
   invitations: many(invitations),
 }));
 
-export const tenantUsersRelations = relations(tenantUsers, ({ one }) => ({
+export const tenantUsersRelations = relations(tenant_users, ({ one }) => ({
   tenant: one(tenants, {
-    fields: [tenantUsers.tenant_id],
+    fields: [tenant_users.tenant_id],
     references: [tenants.id],
   }),
   user: one(users, {
-    fields: [tenantUsers.user_id],
+    fields: [tenant_users.user_id],
     references: [users.id],
   }),
 }));
