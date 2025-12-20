@@ -22,7 +22,6 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
-    usePlural: true,
   }),
   trustedOrigins: [keys().CORS_ORIGIN || ""],
   emailAndPassword: {
@@ -39,12 +38,14 @@ export const auth = betterAuth({
     },
   },
   session: {
+    modelName: "sessions",
     cookieCache: {
       enabled: true,
       maxAge: 60,
     },
   },
   user: {
+    modelName: "users",
     fields: {
       image: "picture",
     },
