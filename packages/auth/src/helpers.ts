@@ -1,4 +1,4 @@
-import { db } from "@CustomerDeskAI/db";
+import { db } from "@CustomerDeskAI/db/client";
 import { tenants, tenantUsers } from "@CustomerDeskAI/db/schema/nile";
 import { and, eq } from "drizzle-orm";
 

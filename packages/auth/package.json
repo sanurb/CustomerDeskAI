@@ -1,25 +1,22 @@
 {
   "name": "@CustomerDeskAI/auth",
-  "exports": {
-    ".": {
-      "default": "./src/index.ts"
-    },
-    "./*": {
-      "default": "./src/*.ts"
-    }
-  },
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
   "devDependencies": {
     "@CustomerDeskAI/config": "workspace:*",
     "typescript": "^5"
   },
   "dependencies": {
     "@CustomerDeskAI/db": "workspace:*",
+    "@CustomerDeskAI/email": "workspace:*",
     "better-auth": "catalog:",
     "better-auth-nile": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
+    "@t3-oss/env-core": "^0.13.8",
     "uuid": "^11.1.0",
     "zod": "catalog:"
   }

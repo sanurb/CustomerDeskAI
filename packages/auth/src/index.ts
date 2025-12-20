@@ -1,5 +1,8 @@
-import { db } from "@CustomerDeskAI/db";
-import * as authSchema from "@CustomerDeskAI/db/schema/auth";
+import { db } from "@CustomerDeskAI/db/client";
+// biome-ignore lint/performance/noNamespaceImport: better-auth expects a namespace import
+import * as schema from "@CustomerDeskAI/db/schema";
+import { sendOrganizationInvitation } from "@CustomerDeskAI/email/send-invitation";
+import { sendEmailVerification } from "@CustomerDeskAI/email/send-verification";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -12,8 +15,7 @@ import {
 } from "better-auth/plugins";
 import { nile } from "better-auth-nile";
 import { v4 as uuidv4 } from "uuid";
-
-const schema = authSchema;
+import { keys } from "../keys";
 
 export const auth = betterAuth({
   appName: "CustomerDeskAI",
@@ -22,12 +24,9 @@ export const auth = betterAuth({
     schema,
     usePlural: true,
   }),
-  trustedOrigins: [process.env.CORS_ORIGIN || ""],
+  trustedOrigins: [keys().CORS_ORIGIN || ""],
   emailAndPassword: {
     enabled: true,
-  },
-  experimental: {
-    joins: true,
   },
   advanced: {
     defaultCookieAttributes: {
@@ -46,13 +45,26 @@ export const auth = betterAuth({
     },
   },
   user: {
-    modelName: "users",
     fields: {
       image: "picture",
     },
   },
+  emailVerification: {
+    async sendVerificationEmail({ user, url }) {
+      console.log("Sending verification email to", user.email);
+      const res = await sendEmailVerification({
+        user,
+        url,
+        token: user.id,
+      });
+      console.log("Verification email sent to", user.email, res);
+    },
+    sendOnSignUp: true,
+  },
   plugins: [
-    nile({}),
+    nile({
+      sendInvitationEmail: sendOrganizationInvitation,
+    }),
     openAPI(),
     bearer(),
     admin(),

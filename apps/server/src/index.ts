@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createContext } from "@CustomerDeskAI/api/context";
 import { appRouter } from "@CustomerDeskAI/api/routers/index";
-import { auth } from "@CustomerDeskAI/auth";
+import { auth } from "@CustomerDeskAI/auth/src/index";
 import { google } from "@ai-sdk/google";
 import { cors } from "@elysiajs/cors";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";

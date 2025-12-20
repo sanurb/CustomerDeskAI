@@ -1,8 +1,5 @@
 {
   "extends": "@CustomerDeskAI/config/nextjs.json",
-  "compilerOptions": {
-    "baseUrl": "."
-  },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]
 }

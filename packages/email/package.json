@@ -1,0 +1,25 @@
+{
+  "name": "@CustomerDeskAI/email",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "lint": "npx ultracite check",
+    "format": "npx ultracite fix",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "@react-email/components": "1.0.1",
+    "resend": "^6.6.0",
+    "@t3-oss/env-nextjs": "^0.13.8",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@CustomerDeskAI/config": "workspace:*",
+    "@types/react": "^19.2.7",
+    "react": "19.2.1",
+    "typescript": "^5.9.3"
+  }
+}
