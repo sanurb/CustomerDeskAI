@@ -1,5 +1,5 @@
-import { db } from "@CustomerDeskAI/db";
-import { tenants, tenantUsers } from "@CustomerDeskAI/db/schema/nile";
+import { db } from "@CustomerDeskAI/db/client";
+import { tenant_users, tenants } from "@CustomerDeskAI/db/schema/nile";
 import { and, eq } from "drizzle-orm";
 
 /**
@@ -47,10 +47,10 @@ export async function getMembership(
   user_id: string;
   roles: string[];
 } | null> {
-  const membership = await db.query.tenantUsers.findFirst({
+  const membership = await db.query.tenant_users.findFirst({
     where: and(
-      eq(tenantUsers.tenant_id, tenantId),
-      eq(tenantUsers.user_id, userId)
+      eq(tenant_users.tenant_id, tenantId),
+      eq(tenant_users.user_id, userId)
     ),
     columns: {
       id: true,

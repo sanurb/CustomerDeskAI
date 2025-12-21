@@ -1,4 +1,4 @@
-import { db } from "@CustomerDeskAI/db";
+import { db } from "@CustomerDeskAI/db/client";
 import { todo } from "@CustomerDeskAI/db/schema/todo";
 import { eq } from "drizzle-orm";
 import z from "zod";

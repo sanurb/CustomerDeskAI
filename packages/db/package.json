@@ -1,16 +1,34 @@
 {
   "name": "@CustomerDeskAI/db",
   "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./*": {
-      "default": "./src/*.ts"
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./src/client.ts"
+    },
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./src/schema/index.ts"
+    },
+    "./schema/*": {
+      "types": "./dist/schema/*.d.ts",
+      "default": "./src/schema/*.ts"
+    },
+    "./keys": {
+      "types": "./dist/keys.d.ts",
+      "default": "./src/keys.ts"
     }
   },
   "scripts": {
     "auth:gen": "pnpm dlx @better-auth/cli@latest generate --config ../auth/src/index.ts --output ./src/schema/auth.ts -y",
+    "build": "tsc",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
@@ -18,7 +36,8 @@
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.8",
@@ -30,6 +49,7 @@
     "drizzle-orm": "catalog:",
     "pg": "^8.16.3",
     "dotenv": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@t3-oss/env-nextjs": "^0.13.8"
   }
 }
