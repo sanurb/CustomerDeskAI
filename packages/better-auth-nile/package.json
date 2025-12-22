@@ -1,14 +1,33 @@
 {
-  "name": "better-auth-nile",
+  "name": "@CustomerDeskAI/better-auth-nile",
   "version": "0.4.0",
   "description": "",
   "main": "./dist/index",
   "module": "./dist/index",
   "types": "./dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./src/client.ts"
+    },
+    "./organization": {
+      "types": "./dist/organization.d.ts",
+      "default": "./src/organization.ts"
+    },
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./src/schema/index.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
-    "test": "jest"
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "author": "",
   "license": "ISC",
@@ -20,6 +39,10 @@
     "tsup": "^8.3.5",
     "uuid": "^11.0.3",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@CustomerDeskAI/config": "workspace:*",
+    "typescript": "^5"
   },
   "files": [
     "dist/**/*"

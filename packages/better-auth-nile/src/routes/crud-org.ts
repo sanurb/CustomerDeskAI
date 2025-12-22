@@ -12,25 +12,25 @@ export const createOrganization = createAuthEndpoint(
     method: "POST",
     body: z.object({
       name: z.string({
-        description: "The name of the organization",
+        error: "The name of the organization",
       }),
       slug: z.string({
-        description: "The slug of the organization",
+        error: "The slug of the organization",
       }),
       userId: z
         .string({
-          description:
+          error:
             "The user id of the organization creator. If not provided, the current user will be used. Should only be used by admins or when called by the server.",
         })
         .optional(),
       logo: z
         .string({
-          description: "The logo of the organization",
+          error: "The logo of the organization",
         })
         .optional(),
       metadata: z
         .record(z.string(), z.any(), {
-          description: "The metadata of the organization",
+          error: "The metadata of the organization",
         })
         .optional(),
     }),
@@ -72,7 +72,7 @@ export const createOrganization = createAuthEndpoint(
 
     if (!canCreateOrg) {
       throw new APIError("FORBIDDEN", {
-        message: "You are not allowed to create an organization",
+        error: "You are not allowed to create an organization",
       });
     }
     const adapter = getOrgAdapter(ctx.context, options);
@@ -87,7 +87,7 @@ export const createOrganization = createAuthEndpoint(
 
     if (hasReachedOrgLimit) {
       throw new APIError("FORBIDDEN", {
-        message: "You have reached the organization limit",
+        error: "You have reached the organization limit",
       });
     }
 
@@ -96,7 +96,7 @@ export const createOrganization = createAuthEndpoint(
     );
     if (existingOrganization) {
       throw new APIError("BAD_REQUEST", {
-        message: "Organization with this slug already exists",
+        error: "Organization with this slug already exists",
       });
     }
     const organization = await adapter.createOrganization({
@@ -127,22 +127,22 @@ export const updateOrganization = createAuthEndpoint(
         .object({
           name: z
             .string({
-              description: "The name of the organization",
+              error: "The name of the organization",
             })
             .optional(),
           slug: z
             .string({
-              description: "The slug of the organization",
+              error: "The slug of the organization",
             })
             .optional(),
           logo: z
             .string({
-              description: "The logo of the organization",
+              error: "The logo of the organization",
             })
             .optional(),
           metadata: z
             .record(z.string(), z.any(), {
-              description: "The metadata of the organization",
+              error: "The metadata of the organization",
             })
             .optional(),
         })
@@ -175,7 +175,7 @@ export const updateOrganization = createAuthEndpoint(
     const session = await ctx.context.getSession(ctx);
     if (!session) {
       throw new APIError("UNAUTHORIZED", {
-        message: "User not found",
+        error: "User not found",
       });
     }
     const organizationId =
@@ -184,7 +184,7 @@ export const updateOrganization = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "Organization id not found!",
+          error: "Organization id not found!",
         },
       });
     }
@@ -197,7 +197,7 @@ export const updateOrganization = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "User is not a member of this organization!",
+          error: "User is not a member of this organization!",
         },
       });
     }
@@ -206,7 +206,7 @@ export const updateOrganization = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "Role not found!",
+          error: "Role not found!",
         },
       });
     }
@@ -216,7 +216,7 @@ export const updateOrganization = createAuthEndpoint(
     if (canUpdateOrg.error) {
       return ctx.json(null, {
         body: {
-          message: "You are not allowed to update this organization",
+          error: "You are not allowed to update this organization",
         },
         status: 403,
       });
@@ -235,7 +235,7 @@ export const deleteOrganization = createAuthEndpoint(
     method: "POST",
     body: z.object({
       organizationId: z.string({
-        description: "The organization id to delete",
+        error: "The organization id to delete",
       }),
     }),
     requireHeaders: true,
@@ -271,7 +271,7 @@ export const deleteOrganization = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "Organization id not found!",
+          error: "Organization id not found!",
         },
       });
     }
@@ -284,7 +284,7 @@ export const deleteOrganization = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "User is not a member of this organization!",
+          error: "User is not a member of this organization!",
         },
       });
     }
@@ -293,7 +293,7 @@ export const deleteOrganization = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "Role not found!",
+          error: "Role not found!",
         },
       });
     }
@@ -302,7 +302,7 @@ export const deleteOrganization = createAuthEndpoint(
     });
     if (canDeleteOrg.error) {
       throw new APIError("FORBIDDEN", {
-        message: "You are not allowed to delete this organization",
+        error: "You are not allowed to delete this organization",
       });
     }
     if (organizationId === session.session.activeOrganizationId) {
@@ -324,12 +324,12 @@ export const getFullOrganization = createAuthEndpoint(
       z.object({
         organizationId: z
           .string({
-            description: "The organization id to get",
+            error: "The organization id to get",
           })
           .optional(),
         organizationSlug: z
           .string({
-            description: "The organization slug to get",
+            error: "The organization slug to get",
           })
           .optional(),
       })
@@ -375,7 +375,7 @@ export const getFullOrganization = createAuthEndpoint(
     });
     if (!organization) {
       throw new APIError("BAD_REQUEST", {
-        message: "Organization not found",
+        error: "Organization not found",
       });
     }
     return ctx.json(organization);
@@ -389,14 +389,14 @@ export const setActiveOrganization = createAuthEndpoint(
     body: z.object({
       organizationId: z
         .string({
-          description:
+          error:
             "The organization id to set as active. It can be null to unset the active organization",
         })
         .nullable()
         .optional(),
       organizationSlug: z
         .string({
-          description:
+          error:
             "The organization slug to set as active. It can be null to unset the active organization if organizationId is not provided",
         })
         .optional(),
@@ -458,7 +458,7 @@ export const setActiveOrganization = createAuthEndpoint(
     if (!isMember) {
       await adapter.setActiveOrganization(session.session.token, null);
       throw new APIError("FORBIDDEN", {
-        message: "You are not a member of this organization",
+        error: "You are not a member of this organization",
       });
     }
     const updatedSession = await adapter.setActiveOrganization(

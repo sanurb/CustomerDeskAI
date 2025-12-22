@@ -1,3 +1,4 @@
+import { nile } from "@CustomerDeskAI/better-auth-nile";
 import { db } from "@CustomerDeskAI/db/client";
 // biome-ignore lint/performance/noNamespaceImport: better-auth expects a namespace import
 import * as schema from "@CustomerDeskAI/db/schema";
@@ -13,7 +14,6 @@ import {
   openAPI,
   twoFactor,
 } from "better-auth/plugins";
-import { nile } from "better-auth-nile";
 import { v4 as uuidv4 } from "uuid";
 import { keys } from "../keys";
 

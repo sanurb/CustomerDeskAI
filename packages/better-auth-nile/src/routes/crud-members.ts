@@ -81,14 +81,14 @@ export const removeMember = createAuthEndpoint(
     method: "POST",
     body: z.object({
       memberIdOrEmail: z.string({
-        description: "The ID or email of the member to remove",
+        error: "The ID or email of the member to remove",
       }),
       /**
        * If not provided, the active organization will be used
        */
       organizationId: z
         .string({
-          description:
+          error:
             "The ID of the organization to remove the member from. If not provided, the active organization will be used",
         })
         .optional(),
@@ -141,7 +141,7 @@ export const removeMember = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "No active organization found!",
+          error: "No active organization found!",
         },
       });
     }
@@ -152,13 +152,13 @@ export const removeMember = createAuthEndpoint(
     });
     if (!member) {
       throw new APIError("BAD_REQUEST", {
-        message: "Member not found!",
+        error: "Member not found!",
       });
     }
     const role = ctx.context.roles[member.role[0]];
     if (!role) {
       throw new APIError("BAD_REQUEST", {
-        message: "Role not found!",
+        error: "Role not found!",
       });
     }
     const isLeaving =
@@ -169,7 +169,7 @@ export const removeMember = createAuthEndpoint(
       member.role[0] === (ctx.context.orgOptions?.creatorRole || "owner");
     if (isOwnerLeaving) {
       throw new APIError("BAD_REQUEST", {
-        message: "You cannot leave the organization as the owner",
+        error: "You cannot leave the organization as the owner",
       });
     }
 
@@ -180,7 +180,7 @@ export const removeMember = createAuthEndpoint(
       }).success;
     if (!canDeleteMember) {
       throw new APIError("UNAUTHORIZED", {
-        message: "You are not allowed to delete this member",
+        error: "You are not allowed to delete this member",
       });
     }
     let existing: Member | null = null;
@@ -194,7 +194,7 @@ export const removeMember = createAuthEndpoint(
     }
     if (existing?.organizationId !== organizationId) {
       throw new APIError("BAD_REQUEST", {
-        message: "Member not found!",
+        error: "Member not found!",
       });
     }
     await adapter.deleteMember(existing.id, organizationId);
@@ -210,7 +210,7 @@ export const removeMember = createAuthEndpoint(
   }
 );
 
-export const updateMemberRole = <O extends OrganizationOptions>(option: O) =>
+export const updateMemberRole = <O extends OrganizationOptions>() =>
   createAuthEndpoint(
     "/organization/update-member-role",
     {
@@ -271,7 +271,7 @@ export const updateMemberRole = <O extends OrganizationOptions>(option: O) =>
         return ctx.json(null, {
           status: 400,
           body: {
-            message: "No active organization found!",
+            error: "No active organization found!",
           },
         });
       }
@@ -284,7 +284,7 @@ export const updateMemberRole = <O extends OrganizationOptions>(option: O) =>
         return ctx.json(null, {
           status: 400,
           body: {
-            message: "Member not found!",
+            error: "Member not found!",
           },
         });
       }
@@ -293,7 +293,7 @@ export const updateMemberRole = <O extends OrganizationOptions>(option: O) =>
         return ctx.json(null, {
           status: 400,
           body: {
-            message: "Role not found!",
+            error: "Role not found!",
           },
         });
       }
@@ -310,7 +310,7 @@ export const updateMemberRole = <O extends OrganizationOptions>(option: O) =>
       if (canUpdateMember) {
         return ctx.json(null, {
           body: {
-            message: "You are not allowed to update this member",
+            error: "You are not allowed to update this member",
           },
           status: 403,
         });
@@ -325,7 +325,7 @@ export const updateMemberRole = <O extends OrganizationOptions>(option: O) =>
         return ctx.json(null, {
           status: 400,
           body: {
-            message: "Member not found!",
+            error: "Member not found!",
           },
         });
       }
@@ -378,7 +378,7 @@ export const getActiveMember = createAuthEndpoint(
       return ctx.json(null, {
         status: 400,
         body: {
-          message: "No active organization found!",
+          error: "No active organization found!",
         },
       });
     }

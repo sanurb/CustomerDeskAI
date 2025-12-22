@@ -13,7 +13,7 @@
     "@CustomerDeskAI/db": "workspace:*",
     "@CustomerDeskAI/email": "workspace:*",
     "better-auth": "catalog:",
-    "better-auth-nile": "workspace:*",
+    "@CustomerDeskAI/better-auth-nile": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "@t3-oss/env-core": "^0.13.8",

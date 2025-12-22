@@ -16,19 +16,19 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
       use: [orgMiddleware, orgSessionMiddleware],
       body: z.object({
         email: z.string({
-          description: "The email address of the user to invite",
+          error: "The email address of the user to invite",
         }),
         role: z.string({
-          description: "The role to assign to the user",
+          error: "The role to assign to the user",
         }) as unknown as InferRolesFromOption<O>,
         organizationId: z
           .string({
-            description: "The organization ID to invite the user to",
+            error: "The organization ID to invite the user to",
           })
           .optional(),
         resend: z
           .boolean({
-            description:
+            error:
               "Resend the invitation email, if the user is already invited",
           })
           .optional(),
@@ -89,7 +89,7 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
           "Invitation email is not enabled. Pass `sendInvitationEmail` to the plugin options to enable it."
         );
         throw new APIError("BAD_REQUEST", {
-          message: "Invitation email is not enabled",
+          error: "Invitation email is not enabled",
         });
       }
 
@@ -98,7 +98,7 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
         ctx.body.organizationId || session.session.activeOrganizationId;
       if (!organizationId) {
         throw new APIError("BAD_REQUEST", {
-          message: "Organization not found",
+          error: "Organization not found",
         });
       }
       const adapter = getOrgAdapter(ctx.context, ctx.context.orgOptions);
@@ -108,13 +108,13 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
       });
       if (!member) {
         throw new APIError("BAD_REQUEST", {
-          message: "Member not found!",
+          error: "Member not found!",
         });
       }
       const role = ctx.context.roles[member.role[0]];
       if (!role) {
         throw new APIError("BAD_REQUEST", {
-          message: "Role not found!",
+          error: "Role not found!",
         });
       }
       const canInvite = role.authorize({
@@ -122,7 +122,7 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
       });
       if (canInvite.error) {
         throw new APIError("FORBIDDEN", {
-          message: "You are not allowed to invite members",
+          error: "You are not allowed to invite members",
         });
       }
       const alreadyMember = await adapter.findMemberByEmail({
@@ -131,7 +131,7 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
       });
       if (alreadyMember) {
         throw new APIError("BAD_REQUEST", {
-          message: "User is already a member of this organization",
+          error: "User is already a member of this organization",
         });
       }
       const alreadyInvited = await adapter.findPendingInvitation({
@@ -140,7 +140,7 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
       });
       if (alreadyInvited.length && !ctx.body.resend) {
         throw new APIError("BAD_REQUEST", {
-          message: "User is already invited to this organization",
+          error: "User is already invited to this organization",
         });
       }
       const invitation = await adapter.createInvitation({
@@ -156,7 +156,7 @@ export const createInvitation = <O extends OrganizationOptions | undefined>(
 
       if (!organization) {
         throw new APIError("BAD_REQUEST", {
-          message: "Organization not found",
+          error: "Organization not found",
         });
       }
 
@@ -183,7 +183,7 @@ export const acceptInvitation = createAuthEndpoint(
     method: "POST",
     body: z.object({
       invitationId: z.string({
-        description: "The ID of the invitation to accept",
+        error: "The ID of the invitation to accept",
       }),
     }),
     use: [orgMiddleware, orgSessionMiddleware],
@@ -266,7 +266,7 @@ export const rejectInvitation = createAuthEndpoint(
     method: "POST",
     body: z.object({
       invitationId: z.string({
-        description: "The ID of the invitation to reject",
+        error: "The ID of the invitation to reject",
       }),
     }),
     use: [orgMiddleware, orgSessionMiddleware],
@@ -332,7 +332,7 @@ export const cancelInvitation = createAuthEndpoint(
     method: "POST",
     body: z.object({
       invitationId: z.string({
-        description: "The ID of the invitation to cancel",
+        error: "The ID of the invitation to cancel",
       }),
     }),
     use: [orgMiddleware, orgSessionMiddleware],
@@ -400,7 +400,7 @@ export const getInvitation = createAuthEndpoint(
     requireHeaders: true,
     query: z.object({
       id: z.string({
-        description: "The ID of the invitation to get",
+        error: "The ID of the invitation to get",
       }),
     }),
     metadata: {
@@ -469,7 +469,7 @@ export const getInvitation = createAuthEndpoint(
     const session = await getSessionFromCtx(ctx);
     if (!session) {
       throw new APIError("UNAUTHORIZED", {
-        message: "Not authenticated",
+        error: "Not authenticated",
       });
     }
     const adapter = getOrgAdapter(ctx.context, ctx.context.orgOptions);
@@ -480,12 +480,12 @@ export const getInvitation = createAuthEndpoint(
       invitation.expiresAt < new Date()
     ) {
       throw new APIError("BAD_REQUEST", {
-        message: "Invitation not found!",
+        error: "Invitation not found!",
       });
     }
     if (invitation.email !== session.user.email) {
       throw new APIError("FORBIDDEN", {
-        message: "You are not the recipient of the invitation",
+        error: "You are not the recipient of the invitation",
       });
     }
     const organization = await adapter.findOrganizationById(
@@ -493,7 +493,7 @@ export const getInvitation = createAuthEndpoint(
     );
     if (!organization) {
       throw new APIError("BAD_REQUEST", {
-        message: "Organization not found",
+        error: "Organization not found",
       });
     }
     const member = await adapter.findMemberByOrgId({
@@ -502,7 +502,7 @@ export const getInvitation = createAuthEndpoint(
     });
     if (!member) {
       throw new APIError("BAD_REQUEST", {
-        message: "Inviter is no longer a member of the organization",
+        error: "Inviter is no longer a member of the organization",
       });
     }
 

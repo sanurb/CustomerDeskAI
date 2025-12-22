@@ -143,6 +143,8 @@ If no action is taken:
 ### In Scope
 
 * Multi-tenant customer support platform
+* Atomic Tenant Provisioning: One-step creation of Workspace + Admin User. 
+* Transactional Onboarding: "All-or-nothing" database commits for new tenants.
 * Full white-label capabilities per tenant
 * Ticket lifecycle management (creation → resolution → audit)
 * Role-based access control
