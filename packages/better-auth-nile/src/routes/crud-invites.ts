@@ -7,7 +7,7 @@ import type { OrganizationOptions } from "../organization";
 import type { InferRolesFromOption } from "../schema";
 
 export const createInvitation = <O extends OrganizationOptions | undefined>(
-  option: O
+  _option: O
 ) =>
   createAuthEndpoint(
     "/organization/invite-member",
