@@ -438,3 +438,33 @@ This project-context.md file provides the **critical rules** AI agents must foll
 **Document Status:** COMPLETE ✅
 **Last Updated:** 2025-12-26
 **Source Documents:** CLAUDE.md, .claude/CLAUDE.md, _bmad-output/architecture.md
+
+---
+
+## Usage Guidelines
+
+**For AI Agents:**
+
+- Read this file before implementing any code
+- Follow ALL rules exactly as documented
+- When in doubt, prefer the more restrictive option
+- Reference `_bmad-output/architecture.md` for complete technical blueprint
+- Ask for clarification rather than guessing when patterns are ambiguous
+
+**For Humans:**
+
+- Keep this file lean and focused on agent needs
+- Update when technology stack changes
+- Review quarterly for outdated rules
+- Remove rules that become obvious over time
+- Use this as onboarding guide for new AI agents joining the project
+
+**Relationship to Other Documents:**
+
+- **project-context.md (this file)**: Critical rules AI agents must follow
+- **architecture.md**: Complete technical blueprint with all decisions, patterns, and structure
+- **CLAUDE.md**: Original engineering standards (consolidated into this file)
+- **.claude/CLAUDE.md**: Additional engineering standards (consolidated into this file)
+
+**Last Updated:** 2025-12-26
+
