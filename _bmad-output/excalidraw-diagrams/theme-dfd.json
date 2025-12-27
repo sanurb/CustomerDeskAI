@@ -1,0 +1,38 @@
+{
+  "name": "Colorful DFD - Data Flow Diagram",
+  "colors": {
+    "process": {
+      "fill": "#fff9c4",
+      "stroke": "#f57c00",
+      "description": "Central system process (circle/ellipse)"
+    },
+    "data_store": {
+      "fill": "#c5e1a5",
+      "stroke": "#558b2f",
+      "description": "Persistent data storage (parallel lines)"
+    },
+    "external_entity": {
+      "fill": "#ffccbc",
+      "stroke": "#d84315",
+      "description": "External actors/systems (rectangles)"
+    },
+    "data_flow": {
+      "stroke": "#f57c00",
+      "description": "Arrows showing data movement"
+    }
+  },
+  "typography": {
+    "process_label": {
+      "fontSize": 18,
+      "fontFamily": 1
+    },
+    "entity_label": {
+      "fontSize": 16,
+      "fontFamily": 1
+    },
+    "flow_label": {
+      "fontSize": 12,
+      "fontFamily": 1
+    }
+  }
+}

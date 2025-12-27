@@ -1,0 +1,57 @@
+{
+  "name": "C4 Model - Multi-Tenancy Architecture",
+  "colors": {
+    "edge_layer": {
+      "fill": "#e3f2fd",
+      "stroke": "#1565c0",
+      "description": "CloudFront, CDN, TLS termination"
+    },
+    "pep_contextualizer": {
+      "fill": "#fff3e0",
+      "stroke": "#ef6c00",
+      "description": "Policy Enforcement Point - Tenant resolution"
+    },
+    "auth_mesh": {
+      "fill": "#f3e5f5",
+      "stroke": "#7b1fa2",
+      "description": "Better-Auth identity binding"
+    },
+    "application_layer": {
+      "fill": "#e8f5e9",
+      "stroke": "#2e7d32",
+      "description": "Elysia/Bun compute layer"
+    },
+    "data_layer": {
+      "fill": "#e0f2f1",
+      "stroke": "#00695c",
+      "description": "PostgreSQL RLS, Upstash Redis"
+    },
+    "data_flow": {
+      "stroke": "#424242",
+      "description": "Request lifecycle arrows"
+    },
+    "trust_boundary": {
+      "stroke": "#d32f2f",
+      "strokeStyle": "dashed",
+      "description": "Security/isolation boundaries"
+    }
+  },
+  "typography": {
+    "component_title": {
+      "fontSize": 20,
+      "fontFamily": 1
+    },
+    "component_tech": {
+      "fontSize": 16,
+      "fontFamily": 1
+    },
+    "component_role": {
+      "fontSize": 14,
+      "fontFamily": 1
+    },
+    "data_label": {
+      "fontSize": 12,
+      "fontFamily": 1
+    }
+  }
+}
