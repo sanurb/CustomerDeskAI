@@ -1827,64 +1827,80 @@ export const workspaceOnboardingChecklist = pgTable('workspace_onboarding_checkl
 
 ### CSS Variable Injection (White-Label Theming)
 
-**Next.js 16 Middleware (apps/web/src/middleware.ts):**
+#### Goals (Non-Negotiable)
+- Theme is applied **before FCP**.
+- Tenant is derived **only** from `Host` (web) or URI namespace (API).
+- **No tenant headers** (`x-tenant-id`) and no “active tenant” cookie.
+- Tenant/theme lookup is **cache-first** to stay under the **<50ms** budget.
 
-```typescript
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+#### Next.js Middleware (apps/web/src/middleware.ts)
+**Middleware is a routing guard only**: validate tenant host + optional canonical redirect.  
+It does **not** hit the database and does **not** inject tenant headers.
 
-export async function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || '';
-  const subdomain = hostname.split('.')[0];
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { tenantService } from "@/server/tenant-service-edge"; // edge-safe (cache/network), no DB client
 
-  // Fetch workspace branding from database
-  const workspace = await db.query.tenants.findFirst({
-    where: eq(tenants.slug, subdomain),
-    columns: {
-      id: true,
-      slug: true,
-      logoUrl: true,
-      primaryColor: true,
-      accentColor: true,
-    },
-  });
+export async function middleware(req: NextRequest) {
+  const host = req.headers.get("host");
+  if (!host) return NextResponse.redirect(new URL("/not-found", req.url), 307);
 
-  if (!workspace) {
-    return NextResponse.next(); // Subdomain not found, serve default
+  const tenant = await tenantService.resolveFromHost(host);
+  if (!tenant) return NextResponse.redirect(new URL("/not-found", req.url), 307);
+
+  // Optional: enforce canonical origin to avoid duplicate origins per tenant
+  const reqOrigin = `${req.nextUrl.protocol}//${host}`;
+  if (tenant.origin && tenant.origin !== reqOrigin) {
+    const url = new URL(req.url);
+    url.host = new URL(tenant.origin).host;
+    return NextResponse.redirect(url, 308);
   }
 
-  // Inject CSS variables into response
-  const response = NextResponse.next();
-  response.headers.set('X-Tenant-ID', workspace.id);
-  response.headers.set('X-Tenant-Slug', workspace.slug);
-
-  // CSS injection happens in layout.tsx via server component
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
 };
-```
+````
 
-**Root Layout (apps/web/src/app/layout.tsx):**
+---
 
-```typescript
-export default async function RootLayout({ children }) {
-  const tenantId = headers().get('X-Tenant-ID');
-  const workspace = await getWorkspaceBranding(tenantId);
+#### Root Layout (apps/web/src/app/layout.tsx)
+
+**Server-render the theme** using `Host` → tenant → brand config.
+Inline the CSS variables in `<head>` so the first paint is themed.
+
+```tsx
+import { headers } from "next/headers";
+import { getBrandConfigFromHost } from "@/server/brand-config";
+
+function toHslTokenOrDefault(value: unknown, fallback: string): string {
+  // Tiger Style safety: never inject untrusted CSS.
+  // Accept strict "H S% L%" (e.g., "220 90% 56%") only.
+  if (typeof value !== "string") return fallback;
+  const ok = /^\d{1,3}\s+\d{1,3}%\s+\d{1,3}%$/.test(value.trim());
+  return ok ? value.trim() : fallback;
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const host = headers().get("host") ?? "";
+  const brand = await getBrandConfigFromHost(host); // cache-first, DB fallback
+
+  const primary = toHslTokenOrDefault(brand?.primaryColor, "220 90% 56%");
+  const accent = toHslTokenOrDefault(brand?.accentColor, "340 82% 52%");
 
   const cssVariables = `
-    :root {
-      --primary: ${workspace.primaryColor || '220 90% 56%'};
-      --accent: ${workspace.accentColor || '340 82% 52%'};
-    }
-  `;
+:root {
+  --primary: ${primary};
+  --accent: ${accent};
+}
+`.trim();
 
   return (
     <html lang="en">
       <head>
-        <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
+        <style id="tenant-theme">{cssVariables}</style>
       </head>
       <body>{children}</body>
     </html>
@@ -1892,7 +1908,28 @@ export default async function RootLayout({ children }) {
 }
 ```
 
-**Performance Constraint:** CSS injection <50ms (NFR from architecture.md)
+#### Brand Config Loader (cache-first) (example: apps/web/src/server/brand-config.ts)
+
+Single responsibility: resolve tenant from host + fetch brand config via cache-aside.
+
+```ts
+import { tenantService } from "@/server/tenant-service";
+import { tenantCache } from "@/server/tenant-cache";
+import { db } from "@/server/db";
+
+export async function getBrandConfigFromHost(host: string) {
+  const tenant = await tenantService.resolveFromHost(host);
+  if (!tenant) return null;
+
+  return tenantCache.getBrandConfig(tenant.id, async () => {
+    // DB fallback (keep payload minimal)
+    return await db.query.workspaces.findFirst({
+      where: (w, { eq }) => eq(w.tenant_id, tenant.id),
+      columns: { primaryColor: true, accentColor: true },
+    });
+  });
+}
+```
 
 ### Accessibility Implementation
 

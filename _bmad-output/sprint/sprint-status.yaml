@@ -1,0 +1,135 @@
+# Sprint Status - CustomerDeskAI
+# Generated: 2026-01-03
+#
+# This file tracks the development status of all epics and stories.
+# Agents and workflows read this file to determine current sprint state.
+#
+# generated: 2026-01-03
+# project: CustomerDeskAI
+# project_key: customerdeskai
+# tracking_system: file-system
+# story_location: _bmad-output/sprint
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-03
+project: CustomerDeskAI
+project_key: customerdeskai
+tracking_system: file-system
+story_location: _bmad-output/sprint
+
+development_status:
+  # Epic 1: Frictionless Workspace Activation
+  epic-1: backlog
+  1-1-single-session-workspace-creation: backlog
+  1-2-fail-safe-atomic-provisioning: backlog
+  1-3-smart-url-conflict-resolution: backlog
+  1-4-progress-persistence-through-interruptions: backlog
+  1-5-instant-branded-dashboard: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: High-Velocity Support Workflow
+  epic-2: backlog
+  2-1-instant-ui-feedback-for-all-actions: backlog
+  2-2-permanent-draft-persistence: backlog
+  2-3-keyboard-only-resolution-flow: backlog
+  2-4-manual-ticket-picking-from-queue: backlog
+  2-5-threaded-conversation-clarity: backlog
+  2-6-spatial-consistency-3-pane-layout: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Knowledge Base for Self-Service
+  epic-3: backlog
+  3-1-rapid-knowledge-base-authoring: backlog
+  3-2-knowledge-base-discovery-via-search: backlog
+  3-3-kb-insertion-in-ticket-replies: backlog
+  3-4-safe-article-archiving-soft-delete: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Institutional Brand Sovereignty
+  epic-4: backlog
+  4-1-instant-visual-brand-identity: backlog
+  4-2-localized-regional-settings-latam: backlog
+  4-3-branded-email-communications: backlog
+  4-4-zero-platform-branding-leakage: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Team Collaboration & Access Control
+  epic-5: backlog
+  5-1-email-based-team-invitations: backlog
+  5-2-one-click-invitation-acceptance: backlog
+  5-3-role-scoped-workspace-views: backlog
+  5-4-multi-workspace-switching: backlog
+  5-5-invitation-resend-for-expired-links: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Platform Reliability & Multi-Tenant Trust
+  epic-6: backlog
+  6-1-zero-zombie-workspaces: backlog
+  6-2-absolute-tenant-data-isolation: backlog
+  6-3-transparent-audit-trail: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Seamless Authentication & Identity
+  epic-7: backlog
+  7-1-email-password-sign-up-sign-in: backlog
+  7-2-social-provider-authentication: backlog
+  7-3-sign-out: backlog
+  7-4-forgot-password-flow: backlog
+  7-5-persistent-sessions-with-activity-renewal: backlog
+  7-6-graceful-session-expiry-handling: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: Timely Customer Communication
+  epic-8: backlog
+  8-1-rapid-email-delivery: backlog
+  8-2-branded-email-templates: backlog
+  8-3-timezone-aware-email-content: backlog
+  8-4-email-deliverability-monitoring: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9: User Account Management & Security
+  epic-9: backlog
+  9-1-profile-management: backlog
+  9-2-account-deletion-with-confirmation: backlog
+  9-3-password-change-requires-current-password: backlog
+  9-4-session-management-dashboard: backlog
+  9-5-sign-out-all-devices-on-password-change: backlog
+  9-6-linked-social-accounts-management: backlog
+  9-7-two-factor-authentication-2fa-setup: backlog
+  9-8-two-factor-authentication-verification: backlog
+  9-9-2fa-backup-codes-and-recovery: backlog
+  9-10-disable-two-factor-authentication: backlog
+  9-11-organization-workspace-switcher: backlog
+  9-12-accept-workspace-invitation: backlog
+  9-13-leave-workspace: backlog
+  9-14-security-status-dashboard: backlog
+  9-15-email-verification: backlog
+  epic-9-retrospective: optional

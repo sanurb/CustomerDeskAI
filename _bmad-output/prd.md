@@ -805,12 +805,15 @@ Your Stats:
   - Seamless re-auth with redirect back to original page
 
 **9. Multi-Workspace Context Corruption**
-- **Scenario:** User has two workspace tabs open, edits tickets in both
-- **Resolution Required:**
-  - Subdomain-based context isolation (each subdomain = separate security origin)
-  - Tenant ID resolved from subdomain (not cookie)
-  - Middleware injects `x-tenant-id` header per request
-  - No cross-tab session hijacking
+- **Scenario:** User has two workspace tabs open (Tenant A and Tenant B) and performs edits in both.
+- **Guarantee:** A request is executed only in the tenant implied by its **origin** (subdomain/custom domain) or **API URI namespace**. Tenant context is never derived from shared client state.
+- **Controls (Required):**
+  - **Origin isolation:** each tenant is served from a distinct origin (`{slug}.customerdeskai.com` or custom domain).
+  - **Tenant resolution:** resolve `tenantId` **only** from `Host` (web) and/or `/v1/tenants/{tenantId}` (API); **never** from headers/cookies/query params.
+  - **Auth cookie scoping:** use **host-only** cookies (no `Domain=.customerdeskai.com`); prefer `__Host-` cookies where supported to prevent cross-subdomain cookie sharing.
+  - **Server-side authorization:** every write/read enforces `user ∈ tenantId` (membership + RBAC) before any data access; mismatch → **403**.
+  - **No global active-tenant state:** no localStorage/cookie “activeTenant”, no client-driven tenant switching without navigating to the tenant origin.
+
 
 **10. Invitation from Different Device**
 - **Scenario:** User receives email on iPhone, clicks link on MacBook

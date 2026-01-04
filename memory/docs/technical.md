@@ -366,7 +366,7 @@ The server MUST expose the following routes:
 
 ## 13. Open Issues
 
-1. **Tenant resolution strategy:** subdomain, header (`x-tenant-id`), or explicit tenant switcher (impacts security and UX)
+1. **Tenant resolution strategy:** Web app uses `{tenant}.app.com` (and optional custom domains) as the source of truth. Public API is tenant-scoped via the URI (`/v1/tenants/{tenantId}/...`). Tenant ID is never accepted from client-provided headers (no `x-tenant-id`). If a user belongs to multiple tenants, the UI switcher updates the active tenant by navigating to the tenant subdomain and/or requesting a tenant-scoped token; every request is authorized against tenant membership.
 2. **User identity rules:** can one user belong to multiple tenants with same email?
 3. **Knowledge base visibility:** public vs authenticated vs mixed
 4. **Per-tenant AI limits:** budgeting, quotas, and controls

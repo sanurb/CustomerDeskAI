@@ -132,122 +132,163 @@ The **29 NFRs** across 8 categories will drive core architectural decisions:
 
 ### Technical Constraints & Dependencies
 
-**Architectural Constraints (Non-Negotiable):**
+## System Invariants (Non-Negotiable)
+These are enforced by code, CI “fitness functions”, and runtime assertions. Violations must fail fast.
 
-**1. Nile Multi-Tenancy Architecture**
-- **Constraint**: No database-level foreign keys across tenants (Nile architectural rule)
-- **Impact**: Requires application-level referential integrity, compensating transaction patterns
-- **Solution Pattern**: Drizzle ORM wrapper intercepts queries, validates `tenant_id` context exists
-- **Enforcement**: Custom ESLint rule flags raw SQL without `WHERE tenant_id = ?`
-- **Example**: Cannot use `FOREIGN KEY (user_id) REFERENCES users(id)` - must validate application-side
+1) **Tenant boundary is explicit and non-overridable**
+- **Web**: tenant is derived only from `Host` (`{slug}.customerdeskai.com` or custom domain).
+- **Public API**: tenant is derived only from URI namespace (`/v1/tenants/{tenantId}/...`).
+- **Prohibited**: client-controlled tenant selection via headers/cookies/query params (no `x-tenant-id`, no `activeTenant` cookie).
+- **Runtime rule**: if tenant cannot be resolved → 404; if tenant resolved but user is not a member → 403.
 
-**2. Compensating Transaction Pattern (Zero Zombie Workspaces)**
-- **Constraint**: Nile tenant creation and Better-Auth user creation are separate atomic operations
-- **Impact**: Partial failures can create "zombie workspaces" (tenant exists, admin user creation failed)
-- **Solution Pattern**: State machine with explicit rollback logic:
-  ```
-  Step 1: Create Nile tenant (reversible)
-  Step 2: Create Better-Auth user (can fail)
-  Step 3: Link via tenant_users (can fail)
-  Step 4: Initialize session (can fail)
-  On failure: Rollback Step 1 (delete tenant), free workspace URL
-  ```
-- **Enforcement**: Integration tests simulate failure at each step, verify rollback
-- **Critical**: NFR-R2 (100% atomicity) depends on this pattern
+2) **All tenant data access is tenant-scoped by construction**
+- Every tenant table **MUST** include `tenant_id`.
+- Every query/update/delete **MUST** include `tenant_id` in the predicate.
+- Cross-tenant joins are forbidden.
 
-**3. Subdomain-Based Tenant Isolation**
-- **Constraint**: Each tenant accessed via `{slug}.customerdeskai.com` subdomain
-- **Impact**: Middleware must extract `tenant_id` from subdomain on every request
-- **Solution Pattern**: Next.js middleware runs before all routes, injects `x-tenant-id` header
-- **Cookie Configuration**: Domain `.customerdeskai.com`, SameSite `Lax` (CSRF protection)
-- **Security**: Browser security origins prevent cross-tenant cookie contamination
+3) **Authorization precedes data access**
+- Any protected operation requires `{tenantId, userId}` and enforces membership + RBAC **before** touching repositories.
 
-**4. CSS Variable Injection Performance (<50ms before FCP)**
-- **Constraint**: NFR-P2 requires theme application before First Contentful Paint
-- **Impact**: Cannot use client-side theme fetching (too slow)
-- **Solution Pattern**: Next.js middleware fetches `brand_config` from database, injects CSS variables at `<html>` root
-- **Caching Strategy**: Edge caching (Vercel Edge Config or similar) for middleware performance
-- **Fallback**: If tenant lookup fails, serve minimal platform branding (never happens in production)
+4) **Onboarding is convergent (no zombie tenants)**
+- Workspace onboarding is implemented as an orchestrated Saga with compensations and idempotency.
 
-**5. White-Label Asset Resolution (Zero Direct S3 URLs)**
-- **Constraint**: NFR-S2 mandates all tenant assets proxied through CDN
-- **Impact**: Cannot expose `s3.amazonaws.com/logo.png` in HTML/email
-- **Solution Pattern**: All assets served via `{slug}.customerdeskai.com/_assets/{file}`
-- **Implementation**: Next.js API route proxies to S3/R2, sets CDN cache headers
-- **Verification**: Automated crawl confirms zero direct storage URLs in rendered output
-
-**6. Email SLA (<30s Delivery, 95th Percentile)**
-- **Constraint**: NFR-P4 requires fast email delivery for invitation acceptance flows
-- **Impact**: Cannot use SMTP (too slow), must use transactional email service
-- **Solution Pattern**: Resend API with webhook tracking (delivered, bounced, complained)
-- **Monitoring**: Synthetic monitoring (Checkly or similar) sends test invites every 15 minutes
-- **Fallback**: Retry logic with exponential backoff for transient failures
-
-**7. RBAC Enforcement on Every RPC Call**
-- **Constraint**: NFR-S2 requires tenant_id + role validation before execution
-- **Impact**: Handlers cannot access data without tenant context
-- **Solution Pattern**: Middleware extracts `activeOrganizationId` from session, queries `tenant_users` for role, injects into context
-- **Attack Prevention**: User who is Admin in Tenant A cannot elevate privileges in Tenant B
-- **Enforcement**: oRPC middleware runs before all protected procedures
-
-**8. Optimistic UI (<200ms Perceived Latency)**
-- **Constraint**: UX NFR-1 requires instant feedback for all user actions
-- **Impact**: Cannot use traditional request/response patterns (spinners, loading states)
-- **Solution Pattern**: UI updates immediately, background sync confirms, inline retry on failure
-- **Example**: CMD+Enter resolves ticket → UI shows next ticket instantly → API call syncs in background
-- **Failure Handling**: Network errors show inline retry button (not full-page error)
+5) **Twelve-Factor operational requirements**
+- Config in env vars only, stateless processes, backing services via URLs, structured logs, disposability, dev/prod parity, horizontal scalability.
 
 ---
 
-**Technology Dependencies:**
+## Architectural Constraints & Patterns (PoEAA-Aligned)
 
-**Core Stack (Already Integrated):**
-- **Next.js 16** + React 19 (Frontend)
-- **Elysia** + Bun (Backend)
-- **PostgreSQL** + Drizzle ORM (Database)
-- **Better-Auth** + Nile Plugin (Multi-tenant auth)
-- **Nile** (Multi-tenancy platform)
-- **Turborepo** + pnpm (Monorepo)
+### 1) Nile Multi-Tenancy (Hard Constraint)
+- **Constraint**: No DB-level foreign keys across tenants (Nile rule).
+- **Impact**: Referential integrity is enforced at the application layer.
+- **Pattern**:
+  - **Repository (Tenant-Scoped)**: All repositories are created via `repo(tenantId)`.
+  - **Unit of Work**: Business operations use a single transaction boundary where possible (`uow.transaction(...)`).
+- **Enforcement (Fitness Functions)**:
+  - Type-level: tenant ID is a branded type required by repository constructors.
+  - Lint: block raw SQL; block any query builder call that does not pass a `tenantId` scope.
+  - Integration: cross-tenant isolation tests must pass (attempt read/write across tenant boundary → forbidden).
 
-**Phase 1 Required Integrations:**
-- **Resend** - Transactional email with <10s SLA (NFR-I3)
-- **React Email** - Email templating with tenant branding injection
-- **PostHog** - Analytics (client + server-side events, session replay)
-- **Radix UI** + **shadcn/ui** - Accessible component primitives (NFR-A1: WCAG 2.1 AA)
-- **Tailwind CSS 4** - CSS variable-based theming for white-label
-- **OpenTelemetry** (Optional) - Distributed tracing for NFR-P1 performance validation
+### 2) Tenant Context Resolution (Host/URI Only)
+- **Constraint**: Tenant context is computed server-side per request and cannot be overridden by client input.
+- **Pattern**:
+  - **Gateway/Edge as Router**: Next.js middleware validates tenant host and performs canonical redirects only (no tenant propagation headers).
+  - **Server as Authority**: Backend re-resolves tenant from Host/URI and re-checks membership (defense-in-depth).
+- **Concrete Rules**:
+  - Unknown host → 404 (or redirect to marketing domain).
+  - Canonicalization: if custom domain maps to tenant, it becomes the canonical `origin` for links/assets.
 
-**Phase 2 Integrations (Deferred):**
-- **Stripe** - Subscription billing (single "Pro" tier initially)
-- **Mercado Pago** - LATAM payment processor (trust factor)
-- **WebSocket Infrastructure** - Real-time presence (Ghost Avatars)
-- **WhatsApp Business API** (Conditional) - Based on Phase 1 customer demand
+### 3) RBAC on Every RPC Call
+- **Constraint**: Every protected RPC requires tenant membership + role.
+- **Pattern**:
+  - **Authorization Service** + **Domain Policy** checks (deny-by-default).
+  - Role loaded from `tenant_users` with key `(tenant_id, user_id)`.
+- **Enforcement**:
+  - oRPC middleware is mandatory; no direct handler exports without middleware.
+
+### 4) Onboarding Atomicity (Saga + Outbox)
+- **Constraint**: Nile tenant creation and Better-Auth user creation are separate atomic operations.
+- **Pattern**:
+  - **Orchestrated Saga** for onboarding.
+  - **Transactional Outbox** for side effects (emails, analytics) to avoid “sent email but transaction failed”.
+- **Saga Steps (Idempotent + Compensable)**:
+
+1. Reserve slug (idempotent, expires)          -> compensate: release reservation
+2. Create Nile tenant (idempotent create)      -> compensate: delete tenant
+3. Create Better-Auth user (idempotent create) -> compensate: delete user (if allowed) or mark disabled
+4. Link tenant_users (idempotent upsert)       -> compensate: delete link
+5. Create session (idempotent)                 -> compensate: revoke session
+6. Emit outbox events (in same DB txn where possible)
+
+- **Enforcement**:
+- Integration tests inject failure at each step and verify compensation + no orphans.
+- Background reconciler job detects and repairs/alerts on orphan states.
+
+### 5) Theme Before FCP (Server-Rendered, Cache-First)
+- **Constraint**: Theme must be applied before First Contentful Paint; budget: **<50ms** tenant-config lookup at edge/server.
+- **Pattern**:
+- Server-render inline `<style id="tenant-theme">` in root layout.
+- Cache-first read of `brand_config` (Redis/Upstash) with DB fallback.
+- **Caching Contract**:
+- Key: `tenant:{tenantId}:brand_config`
+- TTL: 1h, allow stale-while-revalidate.
+- Cache stampede protection: singleflight / lock with short TTL.
+
+### 6) White-Label Assets (Origin-Scoped Proxy)
+- **Constraint**: No direct storage URLs appear in HTML or emails.
+- **Pattern**:
+- Assets served via `{tenantOrigin}/_assets/{file}` (CDN-cacheable).
+- Route handler proxies to S3/R2 and strips storage origin.
+- **Enforcement**:
+- CI crawler verifies rendered DOM/email HTML contains no forbidden domains.
+
+### 7) Email Delivery SLA
+- **Constraint**: Invitation/auth emails delivered in **<30s p95**.
+- **Pattern**:
+- Transactional provider (Resend) + webhook tracking.
+- Outbox-driven send with retries (exponential backoff + jitter).
+- **Enforcement**:
+- Synthetic monitoring every 15 minutes; alert on p95 regression.
 
 ---
 
-**Known Technical Risks:**
+#### Tiger Style Engineering Rules (Applied to This System)
+These are coding constraints, not suggestions.
 
-**Risk 1: Compensating Transaction Failures**
-- **Scenario**: Nile tenant created, Better-Auth user creation fails, rollback fails
-- **Mitigation**: Comprehensive integration tests, rollback verification, timeout alerts
-- **Contingency**: Manual cleanup script, monitoring dashboard for orphaned tenants
-
-**Risk 2: Middleware Performance Degradation**
-- **Scenario**: Tenant lookup for CSS variables exceeds 50ms, breaks NFR-P2 (FCP target)
-- **Mitigation**: Edge caching (Vercel Edge Config), retry logic with exponential backoff
-- **Contingency**: Fallback to minimal platform branding (acceptable degradation)
-
-**Risk 3: Email Deliverability Issues**
-- **Scenario**: Resend SLA degradation, invitations delayed beyond 30s
-- **Mitigation**: Webhook monitoring, bounce tracking, fallback SMTP
-- **Contingency**: Manual email verification link sending via support
-
-**Risk 4: Multi-Workspace Context Corruption**
-- **Scenario**: User has two workspace tabs open, tenant_id context mixes between tabs
-- **Mitigation**: Subdomain-based context isolation (each subdomain = separate security origin)
-- **Enforcement**: Tenant ID resolved from subdomain (not cookie), middleware injects `x-tenant-id` header
+- **Fail fast with assertions**: validate `tenantId`, `userId`, and invariants at boundaries; programmer errors throw immediately.
+- **Explicit control flow**: orchestration functions own branching; leaf helpers are pure (no side effects).
+- **Bounded resources**:
+- Maximum request body sizes per route (explicit).
+- Maximum list/page sizes (explicit defaults; reject oversized).
+- Rate limits keyed by `tenantId`.
+- **No implicit defaults**: all caches, retries, timeouts, and provider options are explicitly set.
+- **Warnings are errors**: strict TypeScript + lint + CI gate; no “temporary” suppressions.
+- **Small units**: functions ≤ ~70 lines; modules are cohesive; no “god services”.
+- **Single source of truth**: no duplicated tenant context; no client-side “active tenant” state.
 
 ---
+
+#### Twelve-Factor Requirements (Concrete)
+- **Config**: all config via env vars (`DATABASE_URL`, `REDIS_URL`, `EMAIL_API_KEY`, etc.). No per-tenant config in build artifacts.
+- **Stateless**: no in-memory tenant/session state relied upon across requests.
+- **Backing services**: DB/Redis/Email treated as attached resources; swap via config.
+- **Logs**: JSON logs. Mandatory fields: `requestId`, `tenantId`, `userId?`, `route`, `status`, `latencyMs`.
+- **Disposability**: graceful shutdown; idempotent handlers; safe retries.
+- **Dev/Prod parity**: same tenant resolution model in local/stage/prod (no “local-only tenant headers”).
+- **Concurrency**: scale horizontally; fairness via tenant-based rate limiting.
+
+---
+
+## Technology Dependencies
+
+### Core Stack (Already Integrated)
+- Next.js 16 + React 19
+- Elysia + Bun
+- PostgreSQL + Drizzle ORM
+- Better-Auth + Nile Plugin
+- Nile
+- Turborepo + pnpm
+
+### Phase 1 Integrations
+- Resend (transactional email)
+- React Email
+- PostHog
+- Radix UI + shadcn/ui
+- Tailwind CSS 4
+- OpenTelemetry (recommended)
+
+---
+
+## Enforcement (CI Fitness Functions)
+Build must fail if any rule is violated.
+
+1) **Tenant scope static checks**: no raw SQL; no tenant-table query without `tenantId`.
+2) **Cross-tenant isolation tests**: attempt A→B data access must fail.
+3) **Saga fault-injection tests**: each step failure results in clean rollback/convergence.
+4) **Asset leak scan**: HTML/email contains no direct storage URLs.
+5) **Performance budget checks**: tenant-config lookup p95 ≤ 50ms in middleware/server instrumentation.
+6) **Strict toolchain**: TS strict, lint strict, formatting fixed, no suppressions.
 
 ### Cross-Cutting Concerns Identified
 
@@ -627,186 +668,221 @@ catch (error) {
 
 ### Category 3: Multi-Tenant Patterns (Vendor-Neutral Architecture)
 
-**Decision: Upstash Redis + Service-Based Saga + Interface-Based Resolution**
+**Decision:** Redis (portable) for edge-friendly tenant config caching + Orchestrated Saga (onboarding) + Host/URI as the only tenant source of truth.
 
-**Critical Evaluation:**
+#### Non-Negotiable Invariants
+- **Tenant context is derived only from request `Host` (web) or URI namespace (public API).**
+- **Tenant is never selected from client-controlled inputs** (no tenant header/cookie/query param).
+- **Authorization is evaluated before any tenant-scoped data access.**
+- **All tenant-scoped queries require `tenantId` by construction.**
 
-**Rejected Patterns (High Coupling):**
-- ❌ Vercel Edge Config (proprietary API, migration blocker)
-- ❌ Inline rollback logic (tight coupling, untestable)
-- ❌ Hardcoded tenant resolution (God File anti-pattern)
+#### Rejected Patterns (High Risk / High Coupling)
+- ❌ **Proprietary config stores** (e.g., Vercel Edge Config) as a hard dependency for correctness.
+- ❌ **Inline rollback logic** spread across handlers (non-testable, non-idempotent).
+- ❌ **“God middleware”** doing routing + auth + theming + side effects.
+- ❌ **Client-provided tenant headers** (`x-tenant-id`) or “active tenant” cookies.
 
-**Adopted Patterns (Low Coupling):**
-- ✅ Upstash Redis via standard Redis API (portable, edge-compatible)
-- ✅ Service-based Saga Orchestrator (separation of concerns)
-- ✅ Interface-based TenantResolver (business logic isolation)
+#### Adopted Patterns (Maintainable + Correct)
+- ✅ **Portable Redis cache** (Upstash today, swap by connection string tomorrow).
+- ✅ **Cache-aside + singleflight** (stampede-safe) with explicit TTLs and timeouts.
+- ✅ **Host/URI Tenant Resolver** (pure parsing + IO lookup), independent of Next.js/Elysia types.
+- ✅ **Orchestrated Saga** with idempotency keys + compensations + outbox for side effects.
+- ✅ **Tenant-scoped repositories** (PoEAA Repository + Unit of Work) to make unsafe queries impossible.
 
-**Edge Caching Strategy: Upstash Redis**
+#### Edge Caching Strategy (Redis, Vendor-Neutral)
 
-**Technology**: Upstash Redis via `@upstash/redis`
+**Technology:** Redis-compatible provider (Upstash via `@upstash/redis` is acceptable; must remain swappable).
 
-**Rationale:**
-- Standard Redis API over HTTP (edge-compatible, no vendor lock-in)
-- <5ms latency (meets NFR-P2: <50ms CSS injection target)
-- Global distribution (LATAM coverage)
-- Portable (swap to any Redis provider via connection string)
+**Hard Requirements:**
+- Explicit TTLs, explicit timeouts, explicit serialization.
+- Stampede protection (singleflight per key).
+- Negative caching for “tenant not found” (short TTL) to protect the DB.
 
-**Implementation:**
-```typescript
-// packages/db/src/cache/tenant-cache.ts
+**Implementation (cache-aside, explicit, stampede-safe):**
+```ts
+// packages/platform/src/tenant/tenant-cache.ts
+import { Redis } from "@upstash/redis";
+
+type BrandConfig = {
+  // keep small, stable, JSON-serializable
+  primary: string;
+  logoKey?: string;
+};
+
+type CacheOptions = {
+  ttl_s: number;
+  negativeTtl_s: number;
+  timeout_ms: number;
+};
+
 export class TenantCache {
-  private redis = new Redis({
-    url: process.env.UPSTASH_REDIS_URL!,
-    token: process.env.UPSTASH_REDIS_TOKEN!,
-  });
+  private redis: Redis;
+  private inflight = new Map<string, Promise<BrandConfig | null>>();
 
-  async getBrandConfig(tenantId: string) {
-    const cached = await this.redis.get<BrandConfig>(`tenant:${tenantId}:brand`);
-    if (cached) return cached;
+  constructor(
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_URL!,
+      token: process.env.UPSTASH_REDIS_TOKEN!,
+    }),
+    private opts: CacheOptions = { ttl_s: 3600, negativeTtl_s: 30, timeout_ms: 50 },
+  ) {
+    this.redis = redis;
+  }
 
-    // Fallback to database (graceful degradation)
-    const config = await db.query.workspaces.findFirst({
-      where: eq(workspaces.tenant_id, tenantId),
+  async getBrandConfig(tenantId: string, loader: () => Promise<BrandConfig | null>) {
+    const key = `tenant:${tenantId}:brand:v1`;
+
+    const cached = await this.withTimeout(this.redis.get<BrandConfig | null>(key), this.opts.timeout_ms);
+    if (cached !== undefined && cached !== null) return cached; // cache hit
+    if (cached === null) return null; // negative cached
+
+    // stampede protection
+    const existing = this.inflight.get(key);
+    if (existing) return existing;
+
+    const p = (async () => {
+      const value = await loader();
+
+      // cache null briefly (negative caching)
+      if (value === null) {
+        await this.redis.set(key, null, { ex: this.opts.negativeTtl_s });
+        return null;
+      }
+
+      await this.redis.set(key, value, { ex: this.opts.ttl_s });
+      return value;
+    })().finally(() => {
+      this.inflight.delete(key);
     });
 
-    await this.redis.set(`tenant:${tenantId}:brand`, config, { ex: 3600 });
-    return config;
+    this.inflight.set(key, p);
+    return p;
+  }
+
+  private async withTimeout<T>(p: Promise<T>, timeout_ms: number): Promise<T> {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeout_ms);
+
+    try {
+      // Upstash client doesn’t universally accept AbortSignal; keep wrapper for future portability
+      return await p;
+    } finally {
+      clearTimeout(t);
+    }
   }
 }
 ```
 
-**Tenant Resolution Architecture: Interface-Based Service**
+#### Tenant Resolution Architecture (Host/URI Only, Interface + Pure Parser)
 
-**Pattern**: Decoupled TenantService with ITenantResolver interface
+**Goal:** Tenant resolution is a small, testable module:
 
-**Rationale:**
-- Decouples business logic from Next.js request/response objects
-- Testable in isolation without mocking Next.js middleware
-- Swappable implementations (Redis-first with database fallback)
+* Pure parsing: `parseTenantFromHost(host)` / `parseTenantFromPath(pathname)`
+* Lookup: `resolveBySlugOrDomain()` / `resolveById()`
 
-**Implementation:**
-```typescript
-// packages/api/src/services/tenant-service.ts
+```ts
+// packages/platform/src/tenant/tenant-resolver.ts
+export type Tenant = { id: string; slug: string; origin: string };
+
 export interface ITenantResolver {
-  resolve(slug: string): Promise<Tenant | null>;
-  getFromRequest(req: Request): Promise<Tenant | null>;
+  resolveFromHost(host: string): Promise<Tenant | null>;
+  resolveFromApiPath(pathname: string): Promise<Tenant | null>;
 }
+
+export function parseTenantFromHost(host: string): { slug?: string; domain?: string } {
+  // Explicit, no magic. Keep it deterministic and unit-tested.
+  // - subdomain: {slug}.customerdeskai.com
+  // - custom domain: maps to tenant by domain
+  const h = host.split(":")[0].toLowerCase();
+
+  if (h.endsWith(".customerdeskai.com")) {
+    const slug = h.replace(".customerdeskai.com", "");
+    if (slug && slug !== "www" && slug !== "app") return { slug };
+  }
+
+  return { domain: h }; // treat any other host as potential custom domain
+}
+```
+
+```ts
+// packages/platform/src/tenant/tenant-service.ts
+import type { ITenantResolver, Tenant } from "./tenant-resolver";
 
 export class TenantService implements ITenantResolver {
-  async resolve(slug: string): Promise<Tenant | null> {
-    const cached = await this.cache.get(`tenant:slug:${slug}`);
-    if (cached) return cached;
+  constructor(
+    private cache: { getBrandConfig: Function }, // keep infra behind ports
+    private db: {
+      findTenantBySlugOrDomain: (x: { slug?: string; domain?: string }) => Promise<Tenant | null>;
+      findTenantById: (tenantId: string) => Promise<Tenant | null>;
+    },
+  ) {}
 
-    const tenant = await this.db.query.tenants.findFirst({
-      where: eq(tenants.slug, slug),
-    });
+  async resolveFromHost(host: string): Promise<Tenant | null> {
+    const key = JSON.stringify(parseTenantFromHost(host));
+    // Tenant identity lookups should also be cached; keep separate keyspace/versioning.
+    return await this.db.findTenantBySlugOrDomain(JSON.parse(key));
+  }
 
-    if (tenant) {
-      await this.cache.set(`tenant:slug:${slug}`, tenant, { ex: 3600 });
-    }
-
-    return tenant;
+  async resolveFromApiPath(pathname: string): Promise<Tenant | null> {
+    // /v1/tenants/{tenantId}/...
+    const m = pathname.match(/^\/v1\/tenants\/([^/]+)(\/|$)/);
+    if (!m) return null;
+    return await this.db.findTenantById(m[1]);
   }
 }
 ```
 
-**Middleware (Thin Orchestrator):**
-```typescript
+#### Next.js Middleware (Routing Guard Only; No Tenant Propagation Headers)
+
+**Rule:** middleware validates tenant and canonicalizes host. It does **not** inject tenant headers, theme, or auth state.
+
+```ts
 // apps/web/middleware.ts
+import { NextRequest, NextResponse } from "next/server";
+import { tenantService } from "@/server/tenant-service-singleton";
+
 export async function middleware(req: NextRequest) {
-  const tenant = await tenantService.getFromRequest(req);
+  const host = req.headers.get("host");
+  if (!host) return NextResponse.redirect(new URL("/not-found", req.url));
 
-  if (!tenant) {
-    return NextResponse.redirect(new URL("/not-found", req.url));
+  const tenant = await tenantService.resolveFromHost(host);
+  if (!tenant) return NextResponse.redirect(new URL("/not-found", req.url));
+
+  // Optional: canonical origin enforcement (avoid duplicate origins)
+  const reqOrigin = `${req.nextUrl.protocol}//${host}`;
+  if (tenant.origin && tenant.origin !== reqOrigin) {
+    const url = new URL(req.url);
+    url.host = new URL(tenant.origin).host;
+    return NextResponse.redirect(url, 308);
   }
 
-  const response = NextResponse.next();
-  response.headers.set("x-tenant-id", tenant.id);
-  response.headers.set("x-tenant-slug", tenant.slug);
-
-  const theme = await themeService.getTheme(tenant.id);
-  response.headers.set("x-brand-theme", JSON.stringify(theme));
-
-  return response;
+  return NextResponse.next();
 }
 ```
 
-**Compensating Transaction Pattern: Service-Based Saga**
+> Theme application happens in the server render path (root layout) using the same `Host`-derived tenant resolution, ensuring **pre-FCP** without relying on response headers.
 
-**Pattern**: Saga Orchestrator with decoupled service rollbacks
+#### Onboarding (PoEAA + Tiger Style): Orchestrated Saga + Outbox
 
-**Rationale:**
-- Separation of concerns (each service exposes `revert(id)` method)
-- Testable in isolation (services unit tested independently)
-- Provider-agnostic (swap Better-Auth by updating AuthService only)
+**Why:** Avoid zombie tenants and avoid “email sent but transaction failed”.
 
-**Implementation:**
-```typescript
-// packages/api/src/orchestrators/saga-orchestrator.ts
-export class SagaOrchestrator {
-  private executedSteps: Array<{ step: SagaStep<any>; result: any }> = [];
+**Rules:**
 
-  async execute() {
-    try {
-      for (const step of this.steps) {
-        const result = await step.do();
-        this.executedSteps.push({ step, result });
-      }
-      return { success: true };
-    } catch (error) {
-      for (const { step, result } of this.executedSteps.reverse()) {
-        try {
-          await step.undo(result);
-        } catch (rollbackError) {
-          Sentry.captureException(rollbackError, {
-            tags: { saga_step: step.name },
-          });
-        }
-      }
-      throw error;
-    }
-  }
-}
-```
+* Each step is **idempotent** (idempotency key).
+* Each step has a **compensation**.
+* Side effects (emails/analytics) go through **outbox** and are retried safely.
 
-**Onboarding Orchestrator (Decoupled):**
-```typescript
-// packages/api/src/routers/onboarding.ts
-export async function startOnboardingSaga(data: OnboardingData) {
-  const saga = new SagaOrchestrator();
+**Enforcement:**
 
-  saga.addStep({
-    name: "confirm_logo",
-    do: () => assetService.confirmLogo(data.logoKey),
-    undo: (result) => assetService.deleteLogo(result.key),
-  });
+* Failure-injection integration tests for each step.
+* Orphan detector job (alerts + auto-repair where safe).
 
-  saga.addStep({
-    name: "create_workspace",
-    do: () => workspaceService.create(data.slug),
-    undo: (tenant) => workspaceService.delete(tenant.id),
-  });
+#### Practical Maintainability Guarantees (CI Fitness Functions)
 
-  saga.addStep({
-    name: "provision_owner",
-    do: () => authService.provisionOwner(data.ownerData),
-    undo: (user) => authService.deprovision(user.id),
-  });
-
-  return await saga.execute();
-}
-```
-
-**Vendor Neutrality Summary:**
-
-| Concern | Rejected (Vendor-Locked) | Adopted (Vendor-Neutral) |
-|---------|--------------------------|--------------------------|
-| **Edge Cache** | Vercel Edge Config | Upstash Redis (Standard API) |
-| **Transactions** | Inline rollback | Saga Orchestrator |
-| **Tenant Logic** | Hardcoded Middleware | Interface-based Service |
-| **Migration Cost** | Multi-week rewrite | Connection string swap |
-
----
+* Static rule: no tenant-scoped query without `tenantId`.
+* Runtime assertion: tenant resolved + authZ enforced before repository access.
+* Tests: cross-tenant isolation + saga fault-injection.
+* Observability: every log/trace includes `tenantId` and `requestId`.
 
 ### Category 4: Frontend State Patterns (Senior Principal Architecture)
 
