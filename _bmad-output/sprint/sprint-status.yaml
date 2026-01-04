@@ -47,12 +47,12 @@ story_location: _bmad-output/sprint
 
 development_status:
   # Epic 1: Frictionless Workspace Activation
-  epic-1: backlog
-  1-1-single-session-workspace-creation: backlog
-  1-2-fail-safe-atomic-provisioning: backlog
-  1-3-smart-url-conflict-resolution: backlog
-  1-4-progress-persistence-through-interruptions: backlog
-  1-5-instant-branded-dashboard: backlog
+  epic-1: in-progress
+  1-1-single-session-workspace-creation: ready-for-dev
+  1-2-fail-safe-atomic-provisioning: ready-for-dev
+  1-3-smart-url-conflict-resolution: ready-for-dev
+  1-4-progress-persistence-through-interruptions: ready-for-dev
+  1-5-instant-branded-dashboard: ready-for-dev
   epic-1-retrospective: optional
 
   # Epic 2: High-Velocity Support Workflow
